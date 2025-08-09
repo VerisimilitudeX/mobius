@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpiMECoV Analysis Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="nav">
+        <div class="container flex items-center justify-between">
+            <a href="/" class="h2">EpiMECoV Dashboard</a>
+            <nav aria-label="Main navigation">
+                <ul class="nav-list">
+                    <li><a href="#pipeline" class="nav-link active">Pipeline</a></li>
+                    <li><a href="#results" class="nav-link">Results</a></li>
+                    <li><a href="#visualization" class="nav-link">Visualization</a></li>
+                    <li><button id="startPipeline" class="btn btn-primary">Start Analysis</button></li>
+                    <li>
+                        <button id="themeToggle" class="btn btn-icon" aria-label="Toggle theme">
+                            <svg class="theme-icon" width="24" height="24" viewBox="0 0 24 24"></svg>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Pipeline Configuration Section -->
+        <section id="pipeline" class="container mt-8 mb-8 fade-in">
+            <h1>Pipeline Configuration</h1>
+            <div class="grid grid-2 mt-6">
+                <div class="card">
+                    <h3>Data Input</h3>
+                    <form id="configForm" class="mt-4">
+                        <div class="form-group">
+                            <label for="condition1">Condition 1 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition1" class="w-full" required 
+                                       placeholder="Enter path to condition 1 data">
+                                <div class="input-hint">Path to your first condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="condition2">Condition 2 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition2" class="w-full" required
+                                       placeholder="Enter path to condition 2 data">
+                                <div class="input-hint">Path to your second condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="condition3">Condition 3 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition3" class="w-full" required
+                                       placeholder="Enter path to condition 3 data">
+                                <div class="input-hint">Path to your third condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="startStep">Start from Step</label>
+                            <select id="startStep" class="w-full" required>
+                                <option value="0">0 - IDAT Verification</option>
+                                <option value="1">1 - Unify IDATs</option>
+                                <option value="2">2 - QA Analysis</option>
+                                <option value="3">3 - Differential Methylation</option>
+                                <option value="4">4 - Prepare Data</option>
+                                <option value="5">5 - Feature Selection</option>
+                                <option value="6">6 - Preprocessing</option>
+                                <option value="7">7 - Feature Engineering</option>
+                                <option value="8">8 - Clinical Features</option>
+                                <option value="9">9 - Baseline Classification</option>
+                                <option value="10">10 - Enhanced Transformer</option>
+                                <option value="11">11 - Summarize Findings</option>
+                                <option value="12">12 - Report DMPs</option>
+                                <option value="13">13 - Visualize Results</option>
+                                <option value="14">14 - Advanced Analysis</option>
+                                <option value="15">15 - Ensemble ML</option>
+                            </select>
+                            <div class="input-hint">Select which pipeline step to start from</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <h3>Pipeline Progress</h3>
+                    <div class="progress-status mt-4">
+                        <div class="progress-text flex justify-between mb-2">
+                            <span>Progress</span>
+                            <span id="progressText">0/16 steps completed</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h4>Current Step</h4>
+                        <div class="status-box mt-2">
+                            <div id="currentStep" class="status-text">Not started</div>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h4>Elapsed Time</h4>
+                        <div class="status-box mt-2">
+                            <div id="elapsedTime" class="status-text">00:00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pipeline Output Section -->
+        <section id="output" class="container mb-8 fade-in">
+            <div class="card">
+                <h3>Pipeline Output</h3>
+                <div id="outputLog" class="log-container mt-4">
+                    <pre><code>Pipeline output will appear here...</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results" class="container mb-8 fade-in">
+            <h2>Analysis Results</h2>
+            <div class="tabs mt-4">
+                <button class="tab active" data-tab="metrics">Metrics</button>
+                <button class="tab" data-tab="downloads">Downloads</button>
+                <button class="tab" data-tab="summary">Data Summary</button>
+            </div>
+            <div class="tab-content">
+                <div class="tab-pane active" id="metricsPane">
+                    <div class="grid grid-3 mt-6">
+                        <div class="card">
+                            <h3>Quality Metrics</h3>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Sample Quality Score</span>
+                                    <span class="metric-value" id="qualityScore">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Detection P-value</span>
+                                    <span class="metric-value" id="detectionPvalue">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Classification Results</h3>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Accuracy</span>
+                                    <span class="metric-value" id="accuracy">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">F1 Score</span>
+                                    <span class="metric-value" id="f1Score">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Feature Statistics</h3>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Selected Features</span>
+                                    <span class="metric-value" id="selectedFeatures">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Significant DMPs</span>
+                                    <span class="metric-value" id="significantDMPs">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="downloadsPane">
+                    <div class="grid grid-2 mt-6">
+                        <div class="card">
+                            <h3>Analysis Reports</h3>
+                            <ul class="download-list mt-4">
+                                <li>
+                                    <span>Complete Analysis Report</span>
+                                    <button class="btn btn-secondary btn-sm" data-file="analysis_report.pdf">
+                                        <span>Download PDF</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <span>Statistical Summary</span>
+                                    <button class="btn btn-secondary btn-sm" data-file="statistical_summary.csv">
+                                        <span>Download CSV</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <h3>Visualization Exports</h3>
+                            <ul class="download-list mt-4">
+                                <li>
+                                    <span>All Plots (High Resolution)</span>
+                                    <button class="btn btn-secondary btn-sm" data-file="plots.zip">
+                                        <span>Download ZIP</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <span>Raw Data</span>
+                                    <button class="btn btn-secondary btn-sm" data-file="raw_data.zip">
+                                        <span>Download ZIP</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="summaryPane">
+                    <div class="grid grid-2 mt-6">
+                        <div class="card">
+                            <h3>Dataset Overview</h3>
+                            <div class="summary-stats mt-4">
+                                <div class="stat-item">
+                                    <span class="stat-label">Total Samples</span>
+                                    <span class="stat-value" id="totalSamples">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Features Analyzed</span>
+                                    <span class="stat-value" id="featuresAnalyzed">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Quality Score</span>
+                                    <span class="stat-value" id="overallQuality">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Key Findings</h3>
+                            <div class="findings-list mt-4" id="keyFindings">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visualization Section -->
+        <section id="visualization" class="container mb-8 fade-in">
+            <h2>Data Visualization</h2>
+            <div class="grid grid-2 mt-6">
+                <div class="card">
+                    <h3>PCA Plot</h3>
+                    <div class="visualization-container mt-4" id="pcaPlot">
+                        <img src="" alt="PCA Plot" class="hidden">
+                        <div class="placeholder">
+                            <svg class="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 3v18H3V3h18m0-2H3a2 2 0 00-2 2v18a2 2 0 002 2h18a2 2 0 002-2V3a2 2 0 00-2-2zm-9 15v-4h4v4h-4z"/>
+                            </svg>
+                            <p>PCA plot will appear after analysis</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Confusion Matrix</h3>
+                    <div class="visualization-container mt-4" id="confusionMatrix">
+                        <img src="" alt="Confusion Matrix" class="hidden">
+                        <div class="placeholder">
+                            <svg class="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 3v18H3V3h18m0-2H3a2 2 0 00-2 2v18a2 2 0 002 2h18a2 2 0 002-2V3a2 2 0 00-2-2zm-9 15v-4h4v4h-4z"/>
+                            </svg>
+                            <p>Confusion matrix will appear after analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="container mt-8 mb-8">
+        <div class="text-center">
+            <p>&copy; 2025 EpiMECoV Analysis Dashboard. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/charts.js"></script>
+</body>
+</html>

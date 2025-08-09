@@ -1,0 +1,35 @@
+=== Epigenetic Transformer Analysis ===
+Data shape => (660, 64), #features=64, classes=['Control', 'LC', 'ME']
+Transformer Test Accuracy => 0.9621
+Confusion Matrix:
+[[65  1  1]
+ [ 2 21  0]
+ [ 0  1 41]]
+Classification Report:
+              precision    recall  f1-score   support
+
+     Control       0.97      0.97      0.97        67
+          LC       0.91      0.91      0.91        23
+          ME       0.98      0.98      0.98        42
+
+    accuracy                           0.96       132
+   macro avg       0.95      0.95      0.95       132
+weighted avg       0.96      0.96      0.96       132
+
+
+=== Stats-based Feature Differences (ANOVA p<0.05) ===
+Found 64 features significantly differ.
+Found 0 features appear 'similar'.
+Sample top 10 diffs [feat, p_val, eta_sq]:
+ - AE_2 => p=1.0000e-14, eta^2~0.181
+ - AE_3 => p=1.0000e-14, eta^2~0.135
+ - AE_4 => p=1.0000e-14, eta^2~0.096
+ - AE_6 => p=1.0000e-14, eta^2~0.130
+ - AE_7 => p=1.0000e-14, eta^2~0.295
+ - AE_8 => p=1.0000e-14, eta^2~0.123
+ - AE_9 => p=1.0000e-14, eta^2~0.268
+ - AE_10 => p=1.0000e-14, eta^2~0.372
+ - AE_11 => p=1.0000e-14, eta^2~0.133
+ - AE_12 => p=1.0000e-14, eta^2~0.128
+
+=== Potential Similarities ===

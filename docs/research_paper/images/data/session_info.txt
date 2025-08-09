@@ -1,0 +1,101 @@
+R version 4.4.1 (2024-06-14)
+Platform: aarch64-apple-darwin20
+Running under: macOS 15.3
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.4-arm64/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.0
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: America/Los_Angeles
+tzcode source: internal
+
+attached base packages:
+[1] parallel  stats4    stats     graphics  grDevices utils     datasets 
+[8] methods   base     
+
+other attached packages:
+ [1] devtools_2.4.5                                     
+ [2] usethis_3.1.0                                      
+ [3] maxprobes_0.0.2                                    
+ [4] IlluminaHumanMethylationEPICanno.ilm10b4.hg19_0.6.0
+ [5] minfiData_0.50.0                                   
+ [6] IlluminaHumanMethylation450kanno.ilmn12.hg19_0.6.1 
+ [7] BiocParallel_1.38.0                                
+ [8] IlluminaHumanMethylationEPICmanifest_0.3.0         
+ [9] IlluminaHumanMethylation450kmanifest_0.4.0         
+[10] minfi_1.50.0                                       
+[11] bumphunter_1.46.0                                  
+[12] locfit_1.5-9.10                                    
+[13] iterators_1.0.14                                   
+[14] foreach_1.5.2                                      
+[15] Biostrings_2.72.1                                  
+[16] XVector_0.44.0                                     
+[17] SummarizedExperiment_1.34.0                        
+[18] Biobase_2.64.0                                     
+[19] MatrixGenerics_1.16.0                              
+[20] matrixStats_1.4.1                                  
+[21] GenomicRanges_1.56.2                               
+[22] GenomeInfoDb_1.40.1                                
+[23] IRanges_2.38.1                                     
+[24] S4Vectors_0.42.1                                   
+[25] BiocGenerics_0.50.0                                
+
+loaded via a namespace (and not attached):
+  [1] RColorBrewer_1.1-3        jsonlite_1.8.9           
+  [3] magrittr_2.0.3            GenomicFeatures_1.56.0   
+  [5] fs_1.6.5                  BiocIO_1.14.0            
+  [7] zlibbioc_1.50.0           vctrs_0.6.5              
+  [9] multtest_2.60.0           memoise_2.0.1            
+ [11] Rsamtools_2.20.0          DelayedMatrixStats_1.26.0
+ [13] RCurl_1.98-1.16           askpass_1.2.1            
+ [15] htmltools_0.5.8.1         S4Arrays_1.4.1           
+ [17] curl_6.0.1                Rhdf5lib_1.26.0          
+ [19] SparseArray_1.4.8         rhdf5_2.48.0             
+ [21] nor1mix_1.3-3             htmlwidgets_1.6.4        
+ [23] plyr_1.8.9                cachem_1.1.0             
+ [25] GenomicAlignments_1.40.0  mime_0.12                
+ [27] lifecycle_1.0.4           pkgconfig_2.0.3          
+ [29] Matrix_1.7-1              R6_2.5.1                 
+ [31] fastmap_1.2.0             GenomeInfoDbData_1.2.12  
+ [33] shiny_1.10.0              digest_0.6.37            
+ [35] siggenes_1.78.0           reshape_0.8.9            
+ [37] AnnotationDbi_1.66.0      pkgload_1.4.0            
+ [39] RSQLite_2.3.9             base64_2.0.2             
+ [41] httr_1.4.7                abind_1.4-8              
+ [43] compiler_4.4.1            beanplot_1.3.1           
+ [45] rngtools_1.5.2            remotes_2.5.0            
+ [47] bit64_4.5.2               DBI_1.2.3                
+ [49] pkgbuild_1.4.5            HDF5Array_1.32.1         
+ [51] MASS_7.3-61               openssl_2.3.0            
+ [53] sessioninfo_1.2.2         DelayedArray_0.30.1      
+ [55] rjson_0.2.23              tools_4.4.1              
+ [57] httpuv_1.6.15             glue_1.8.0               
+ [59] quadprog_1.5-8            restfulr_0.0.15          
+ [61] promises_1.3.2            nlme_3.1-166             
+ [63] rhdf5filters_1.16.0       grid_4.4.1               
+ [65] generics_0.1.3            tzdb_0.4.0               
+ [67] preprocessCore_1.66.0     tidyr_1.3.1              
+ [69] data.table_1.16.4         hms_1.1.3                
+ [71] xml2_1.3.6                pillar_1.10.0            
+ [73] limma_3.60.6              later_1.4.1              
+ [75] genefilter_1.86.0         splines_4.4.1            
+ [77] dplyr_1.1.4               lattice_0.22-6           
+ [79] survival_3.8-3            rtracklayer_1.64.0       
+ [81] bit_4.5.0.1               GEOquery_2.72.0          
+ [83] annotate_1.82.0           tidyselect_1.2.1         
+ [85] miniUI_0.1.1.1            scrime_1.3.5             
+ [87] statmod_1.5.0             UCSC.utils_1.0.0         
+ [89] yaml_2.3.10               codetools_0.2-20         
+ [91] tibble_3.2.1              cli_3.6.3                
+ [93] xtable_1.8-4              Rcpp_1.0.13-1            
+ [95] png_0.1-8                 XML_3.99-0.17            
+ [97] ellipsis_0.3.2            readr_2.1.5              
+ [99] blob_1.2.4                mclust_6.1.1             
+[101] profvis_0.4.0             doRNG_1.8.6              
+[103] urlchecker_1.0.1          sparseMatrixStats_1.16.0 
+[105] bitops_1.0-9              illuminaio_0.46.0        
+[107] purrr_1.0.2               crayon_1.5.3             
+[109] rlang_1.1.4               KEGGREST_1.44.1          

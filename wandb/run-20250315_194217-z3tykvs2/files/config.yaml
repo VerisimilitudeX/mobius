@@ -1,0 +1,48 @@
+_wandb:
+    value:
+        cli_version: 0.19.7
+        m: []
+        python_version: 3.12.9
+        t:
+            "1":
+                - 1
+                - 55
+            "2":
+                - 1
+                - 55
+            "3":
+                - 16
+                - 23
+                - 55
+            "4": 3.12.9
+            "5": 0.19.7
+            "8":
+                - 5
+            "12": 0.19.7
+            "13": darwin-arm64
+architecture:
+    value: SOTA Transformer with ALiBi + LoRA + MoE
+batch_size:
+    value: 8
+chunk_size:
+    value: 1000
+dropout:
+    value: 0.2
+ff_dim:
+    value: 1024
+finetune_epochs:
+    value: 100
+learning_rate:
+    value: 0.0001
+lora_r:
+    value: 8
+model_dim:
+    value: 256
+moe_experts:
+    value: 4
+n_layers:
+    value: 6
+num_heads:
+    value: 8
+pretrain_epochs:
+    value: 30

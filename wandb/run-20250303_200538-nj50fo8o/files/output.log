@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Volumes/T9/EpiMECoV/src/original/steps/transformer_classifier.py", line 510, in <module>
+    main()
+  File "/Volumes/T9/EpiMECoV/src/original/steps/transformer_classifier.py", line 458, in main
+    tmpdir = os.environ['SLURM_TMPDIR']
+             ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 714, in __getitem__
+KeyError: 'SLURM_TMPDIR'

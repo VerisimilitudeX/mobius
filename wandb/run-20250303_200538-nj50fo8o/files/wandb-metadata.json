@@ -1,0 +1,16 @@
+{
+  "os":  "macOS-15.4-arm64-arm-64bit",
+  "python":  "CPython 3.12.9",
+  "startedAt":  "2025-03-04T04:05:38.605476Z",
+  "program":  "/Volumes/T9/EpiMECoV/src/original/steps/transformer_classifier.py",
+  "codePath":  "src/original/steps/transformer_classifier.py",
+  "git":  {
+    "remote":  "https://github.com/VerisimilitudeX/EpiMECoV.git",
+    "commit":  "41158fd27d101a78bbe22dee3547831464bb0d7f"
+  },
+  "email":  "acharyapiyush1@outlook.com",
+  "root":  "/Volumes/T9/EpiMECoV",
+  "host":  "MacBook-Pro-M4.local",
+  "executable":  "/opt/homebrew/opt/python@3.12/bin/python3.12",
+  "codePathLocal":  "src/original/steps/transformer_classifier.py"
+}

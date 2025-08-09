@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpiMECoV Analysis Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="nav">
+        <div class="container flex items-center justify-between">
+            <a href="/" class="h2">EpiMECoV</a>
+            <nav aria-label="Main navigation">
+                <ul class="nav-list">
+                    <li><a href="#features" class="nav-link">Features</a></li>
+                    <li><a href="#getting-started" class="nav-link">Getting Started</a></li>
+                    <li><a href="#documentation" class="nav-link">Documentation</a></li>
+                    <li><a href="/dashboard" class="btn btn-primary">Launch Dashboard</a></li>
+                    <li>
+                        <button id="themeToggle" class="btn btn-icon" aria-label="Toggle theme">
+                            <svg class="theme-icon" width="24" height="24" viewBox="0 0 24 24"></svg>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1>Advanced Epigenetic Analysis Platform</h1>
+                    <p class="hero-text">Powerful methylation analysis pipeline for processing and analyzing epigenetic data. Connect remotely or run locally with seamless integration.</p>
+                    <div class="hero-actions">
+                        <a href="/dashboard" class="btn btn-primary btn-lg">Get Started</a>
+                        <a href="#features" class="btn btn-secondary btn-lg">Learn More</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features section-padding">
+            <div class="container">
+                <h2>Platform Features</h2>
+                <div class="grid grid-3 mt-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <h3>Secure Remote Access</h3>
+                        <p>Connect to your analysis pipeline from anywhere through our secure web interface.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            </svg>
+                        </div>
+                        <h3>Advanced Pipeline</h3>
+                        <p>Comprehensive methylation analysis with automated quality control and preprocessing.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M4 3h16a2 2 0 0 1 2 2v6a10 10 0 0 1-10 10A10 10 0 0 1 2 11V5a2 2 0 0 1 2-2z"/>
+                            </svg>
+                        </div>
+                        <h3>Interactive Visualizations</h3>
+                        <p>Real-time data visualization with interactive plots and customizable analytics.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Getting Started Section -->
+        <section id="getting-started" class="section-padding bg-secondary">
+            <div class="container">
+                <h2>Getting Started</h2>
+                <div class="grid grid-2 mt-6">
+                    <div class="setup-card">
+                        <h3>Remote Access</h3>
+                        <ol class="setup-steps">
+                            <li>Create an account or sign in</li>
+                            <li>Configure your connection settings</li>
+                            <li>Connect to your running pipeline instance</li>
+                            <li>Start analyzing your data</li>
+                        </ol>
+                        <a href="/register" class="btn btn-primary mt-4">Create Account</a>
+                    </div>
+                    <div class="setup-card">
+                        <h3>Local Setup</h3>
+                        <ol class="setup-steps">
+                            <li>Download the EpiMECoV package</li>
+                            <li>Run the installation script</li>
+                            <li>Start the pipeline master</li>
+                            <li>Access through localhost</li>
+                        </ol>
+                        <a href="/download" class="btn btn-primary mt-4">Download Package</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Documentation Section -->
+        <section id="documentation" class="section-padding">
+            <div class="container">
+                <h2>Documentation</h2>
+                <div class="grid grid-3 mt-6">
+                    <a href="/docs/quickstart" class="doc-card">
+                        <h3>Quick Start Guide</h3>
+                        <p>Get up and running with EpiMECoV in minutes</p>
+                    </a>
+                    <a href="/docs/api" class="doc-card">
+                        <h3>API Reference</h3>
+                        <p>Complete API documentation for developers</p>
+                    </a>
+                    <a href="/docs/examples" class="doc-card">
+                        <h3>Examples</h3>
+                        <p>Sample analyses and use cases</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section section-padding bg-gradient">
+            <div class="container text-center">
+                <h2>Ready to Start Your Analysis?</h2>
+                <p class="mt-4">Join the growing community of researchers using EpiMECoV for their methylation studies.</p>
+                <div class="mt-6">
+                    <a href="/dashboard" class="btn btn-primary btn-lg">Launch Dashboard</a>
+                    <a href="/docs" class="btn btn-secondary btn-lg ml-4">Read Documentation</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="grid grid-4">
+                <div class="footer-col">
+                    <h4>EpiMECoV</h4>
+                    <p>Advanced epigenetic analysis platform for researchers and institutions.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="/dashboard">Dashboard</a></li>
+                        <li><a href="/docs">Documentation</a></li>
+                        <li><a href="/support">Support</a></li>
+                        <li><a href="/blog">Blog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="/tutorials">Tutorials</a></li>
+                        <li><a href="/api">API</a></li>
+                        <li><a href="/downloads">Downloads</a></li>
+                        <li><a href="/community">Community</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Connect</h4>
+                    <ul>
+                        <li><a href="https://github.com/epimecov">GitHub</a></li>
+                        <li><a href="https://twitter.com/epimecov">Twitter</a></li>
+                        <li><a href="/contact">Contact</a></li>
+                        <li><a href="/about">About</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 EpiMECoV. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/theme.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

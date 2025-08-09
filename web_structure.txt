@@ -1,0 +1,2498 @@
+Directory: .
+==================================================
+File: ./web/index.html
+--------------------------------------------------
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpiMECoV | Epigenetic Analysis Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <meta name="description" content="Advanced epigenetic analysis platform for methylation studies and biomarker discovery">
+</head>
+<body>
+    <header class="nav">
+        <div class="container flex items-center justify-between">
+            <a href="/" class="logo">
+                <span class="logo-text">EpiMECoV</span>
+            </a>
+            <nav aria-label="Main navigation">
+                <ul class="nav-list">
+                    <li><a href="#pipeline" class="nav-link active">Pipeline</a></li>
+                    <li><a href="#results" class="nav-link">Results</a></li>
+                    <li><a href="#visualization" class="nav-link">Visualization</a></li>
+                    <li>
+                        <button id="themeToggle" class="btn btn-icon" aria-label="Toggle theme">
+                            <svg class="theme-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+                        </button>
+                    </li>
+                </ul>
+                <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <div class="mobile-menu">
+        <ul>
+            <li><a href="#pipeline">Pipeline</a></li>
+            <li><a href="#results">Results</a></li>
+            <li><a href="#visualization">Visualization</a></li>
+        </ul>
+    </div>
+
+    <main>
+        <!-- Pipeline Configuration Section -->
+        <section id="pipeline" class="container mt-8 mb-8 fade-in">
+            <div class="section-header">
+                <h1>Pipeline Configuration</h1>
+                <p class="section-description">Set up your epigenetic analysis parameters below to begin processing your methylation data.</p>
+            </div>
+            
+            <div class="grid grid-2 mt-6">
+                <div class="card pipeline-config">
+                    <h3>Data Input</h3>
+                    <form id="configForm" class="mt-4">
+                        <div class="form-group">
+                            <label for="condition1">Condition 1 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition1" class="w-full" required 
+                                       placeholder="/path/to/condition1">
+                                <div class="input-hint">Path to your first condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="condition2">Condition 2 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition2" class="w-full" required
+                                       placeholder="/path/to/condition2">
+                                <div class="input-hint">Path to your second condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="condition3">Condition 3 Path</label>
+                            <div class="input-group">
+                                <input type="text" id="condition3" class="w-full" required
+                                       placeholder="/path/to/condition3">
+                                <div class="input-hint">Path to your third condition data directory</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="startStep">Start from Step</label>
+                            <select id="startStep" class="w-full" required>
+                                <option value="0">0 - IDAT Verification</option>
+                                <option value="1">1 - Unify IDATs</option>
+                                <option value="2">2 - QA Analysis</option>
+                                <option value="3">3 - Differential Methylation</option>
+                                <option value="4">4 - Prepare Data</option>
+                                <option value="5">5 - Feature Selection</option>
+                                <option value="6">6 - Preprocessing</option>
+                                <option value="7">7 - Feature Engineering</option>
+                                <option value="8">8 - Clinical Features</option>
+                                <option value="9">9 - Baseline Classification</option>
+                                <option value="10">10 - Enhanced Transformer</option>
+                                <option value="11">11 - Summarize Findings</option>
+                                <option value="12">12 - Report DMPs</option>
+                                <option value="13">13 - Visualize Results</option>
+                                <option value="14">14 - Advanced Analysis</option>
+                                <option value="15">15 - Ensemble ML</option>
+                            </select>
+                            <div class="input-hint">Select which pipeline step to start from</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="startPipeline" class="btn btn-primary">Start Analysis</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card pipeline-status">
+                    <h3>Pipeline Progress</h3>
+                    <div class="progress-status mt-4">
+                        <div class="progress-text flex justify-between mb-2">
+                            <span>Progress</span>
+                            <span id="progressText">0/16 steps completed</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="status-grid mt-6">
+                        <div class="status-item">
+                            <h4>Current Step</h4>
+                            <div class="status-box">
+                                <div id="currentStep" class="status-text">Not started</div>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <h4>Elapsed Time</h4>
+                            <div class="status-box">
+                                <div id="elapsedTime" class="status-text">00:00:00</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="connectionStatus" class="connection-status disconnected mt-4" title="Connection: disconnected">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Disconnected</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pipeline Output Section -->
+        <section id="output" class="container mb-8 fade-in">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Pipeline Output</h3>
+                    <div class="card-actions">
+                        <button id="clearLog" class="btn btn-icon" title="Clear log">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                        <button id="copyLog" class="btn btn-icon" title="Copy log">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="outputLog" class="log-container mt-2">
+                    <pre><code>EpiMECoV Pipeline v2.1.3
+Ready to start analysis...
+</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results" class="container mb-8 fade-in">
+            <div class="section-header">
+                <h2>Analysis Results</h2>
+                <p class="section-description">Comprehensive results from your methylation analysis pipeline run.</p>
+            </div>
+            
+            <div class="tabs mt-4">
+                <button class="tab active" data-tab="metrics">Metrics</button>
+                <button class="tab" data-tab="downloads">Downloads</button>
+                <button class="tab" data-tab="summary">Data Summary</button>
+            </div>
+            <div class="tab-content">
+                <div class="tab-pane active" id="metricsPane">
+                    <div class="grid grid-3 mt-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Quality Metrics</h3>
+                                <div class="badge success">Passed</div>
+                            </div>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Sample Quality Score</span>
+                                    <span class="metric-value" id="qualityScore">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Detection P-value</span>
+                                    <span class="metric-value" id="detectionPvalue">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Classification Results</h3>
+                                <div class="badge info">ML Metrics</div>
+                            </div>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Accuracy</span>
+                                    <span class="metric-value" id="accuracy">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">F1 Score</span>
+                                    <span class="metric-value" id="f1Score">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Feature Statistics</h3>
+                                <div class="badge warning">Features</div>
+                            </div>
+                            <div class="metrics-container mt-4">
+                                <div class="metric">
+                                    <span class="metric-label">Selected Features</span>
+                                    <span class="metric-value" id="selectedFeatures">-</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">Significant DMPs</span>
+                                    <span class="metric-value" id="significantDMPs">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="downloadsPane">
+                    <div class="grid grid-2 mt-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Analysis Reports</h3>
+                                <div class="badge info">Reports</div>
+                            </div>
+                            <ul class="download-list mt-4">
+                                <li>
+                                    <div class="download-info">
+                                        <span class="download-name">Complete Analysis Report</span>
+                                        <span class="download-meta">PDF</span>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" data-file="analysis_report.pdf">
+                                        <span>Download</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <div class="download-info">
+                                        <span class="download-name">Statistical Summary</span>
+                                        <span class="download-meta">CSV</span>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" data-file="statistical_summary.csv">
+                                        <span>Download</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Visualization Exports</h3>
+                                <div class="badge success">Visuals</div>
+                            </div>
+                            <ul class="download-list mt-4">
+                                <li>
+                                    <div class="download-info">
+                                        <span class="download-name">All Plots (High Resolution)</span>
+                                        <span class="download-meta">ZIP</span>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" data-file="plots.zip">
+                                        <span>Download</span>
+                                    </button>
+                                </li>
+                                <li>
+                                    <div class="download-info">
+                                        <span class="download-name">Raw Data</span>
+                                        <span class="download-meta">ZIP</span>
+                                    </div>
+                                    <button class="btn btn-secondary btn-sm" data-file="raw_data.zip">
+                                        <span>Download</span>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" id="summaryPane">
+                    <div class="grid grid-2 mt-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Dataset Overview</h3>
+                                <div class="badge info">Stats</div>
+                            </div>
+                            <div class="summary-stats mt-4">
+                                <div class="stat-item">
+                                    <span class="stat-label">Total Samples</span>
+                                    <span class="stat-value" id="totalSamples">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Features Analyzed</span>
+                                    <span class="stat-value" id="featuresAnalyzed">-</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">Quality Score</span>
+                                    <span class="stat-value" id="overallQuality">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Key Findings</h3>
+                                <div class="badge warning">Insights</div>
+                            </div>
+                            <div class="findings-list mt-4" id="keyFindings">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Visualization Section -->
+        <section id="visualization" class="container mb-8 fade-in">
+            <div class="section-header">
+                <h2>Data Visualization</h2>
+                <p class="section-description">Interactive visualizations of your epigenetic data analysis results.</p>
+            </div>
+            
+            <div class="grid grid-2 mt-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>PCA Plot</h3>
+                        <div class="viz-controls">
+                            <button class="btn btn-icon" id="pcaFullscreen" title="Fullscreen">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="visualization-container mt-4" id="pcaPlot">
+                        <img src="" alt="PCA Plot" class="hidden">
+                        <div class="placeholder">
+                            <svg class="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 3v18H3V3h18m0-2H3a2 2 0 00-2 2v18a2 2 0 002 2h18a2 2 0 002-2V3a2 2 0 00-2-2z"/>
+                            </svg>
+                            <p>PCA plot will appear after analysis</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Confusion Matrix</h3>
+                        <div class="viz-controls">
+                            <button class="btn btn-icon" id="cmFullscreen" title="Fullscreen">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="visualization-container mt-4" id="confusionMatrix">
+                        <img src="" alt="Confusion Matrix" class="hidden">
+                        <div class="placeholder">
+                            <svg class="placeholder-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 3v18H3V3h18m0-2H3a2 2 0 00-2 2v18a2 2 0 002 2h18a2 2 0 002-2V3a2 2 0 00-2-2z"/>
+                            </svg>
+                            <p>Confusion matrix will appear after analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">
+                    <span class="logo-text">EpiMECoV</span>
+                    <p class="footer-tagline">Advanced Epigenetic Analysis Platform</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-col">
+                        <h4>Platform</h4>
+                        <ul>
+                            <li><a href="#pipeline">Pipeline</a></li>
+                            <li><a href="#results">Results</a></li>
+                            <li><a href="#visualization">Visualization</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 EpiMECoV Analysis Dashboard. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/theme.js"></script>
+    <script src="js/charts.js"></script>
+</body>
+</html>
+--------------------------------------------------
+File: ./web/._index.html
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/server.py
+--------------------------------------------------
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
+import jwt
+import os
+import secrets
+from functools import wraps
+from datetime import datetime, timedelta
+
+app = Flask(__name__)
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.config['JWT_EXPIRATION_HOURS'] = 24
+
+# Store active connections and their tokens
+active_connections = {}
+api_keys = set()  # In production, this should be in a secure database
+
+def generate_token():
+    expiration = datetime.utcnow() + timedelta(hours=app.config['JWT_EXPIRATION_HOURS'])
+    return jwt.encode(
+        {'exp': expiration},
+        app.config['SECRET_KEY'],
+        algorithm='HS256'
+    )
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split(' ')[1]
+        
+        if not token:
+            return jsonify({'message': 'Token is missing'}), 401
+
+        try:
+            jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        except:
+            return jsonify({'message': 'Token is invalid'}), 401
+
+        return f(*args, **kwargs)
+    return decorated
+
+# Serve static files
+@app.route('/')
+def serve_landing():
+    return send_from_directory('web', 'landing.html')
+
+@app.route('/dashboard')
+def serve_dashboard():
+    return send_from_directory('web', 'dashboard.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory('web', path)
+
+# API Routes
+@app.route('/api/auth', methods=['POST'])
+def authenticate():
+    data = request.json
+    api_key = data.get('apiKey')
+    
+    if not api_key or api_key not in api_keys:
+        return jsonify({'message': 'Invalid API key'}), 401
+    
+    token = generate_token()
+    return jsonify({'token': token})
+
+@app.route('/api/config', methods=['POST'])
+@token_required
+def save_config():
+    config = request.json
+    # Save configuration logic here
+    return jsonify({'message': 'Configuration saved'})
+
+@app.route('/api/pipeline/start', methods=['POST'])
+@token_required
+def start_pipeline():
+    config = request.json
+    # Start pipeline logic here
+    return jsonify({'message': 'Pipeline started'})
+
+# WebSocket Events
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+    if request.sid in active_connections:
+        del active_connections[request.sid]
+
+@socketio.on('auth')
+def handle_authentication(data):
+    try:
+        token = data.get('token')
+        if token:
+            jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            active_connections[request.sid] = {'authenticated': True}
+            emit('auth_success')
+        else:
+            emit('auth_failed', {'message': 'No token provided'})
+    except jwt.ExpiredSignatureError:
+        emit('auth_failed', {'message': 'Token expired'})
+    except jwt.InvalidTokenError:
+        emit('auth_failed', {'message': 'Invalid token'})
+
+@socketio.on('pipeline_command')
+def handle_pipeline_command(data):
+    if not active_connections.get(request.sid, {}).get('authenticated'):
+        emit('error', {'message': 'Not authenticated'})
+        return
+    
+    command = data.get('command')
+    # Handle pipeline commands here
+    emit('command_response', {'status': 'success'})
+
+def create_api_key():
+    """Generate a new API key and add it to the set of valid keys"""
+    api_key = secrets.token_urlsafe(32)
+    api_keys.add(api_key)
+    return api_key
+
+if __name__ == '__main__':
+    # Generate initial API key if none exist
+    if not api_keys:
+        initial_key = create_api_key()
+        print(f"Initial API Key: {initial_key}")
+    
+    socketio.run(app, debug=True)
+--------------------------------------------------
+File: ./web/requirements.txt
+--------------------------------------------------
+aiohttp==3.9.1
+websockets==12.0
+watchdog==3.0.0
+Flask==2.0.1
+Flask-CORS==3.0.10
+Flask-SocketIO==5.1.1
+PyJWT==2.3.0
+python-socketio==5.5.0
+eventlet==0.33.0
+python-dotenv==0.19.0
+cryptography==37.0.2
+--------------------------------------------------
+File: ./web/start.sh
+--------------------------------------------------
+#!/bin/bash
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to setup Python virtual environment
+setup_venv() {
+    if ! command_exists python3; then
+        echo "Error: Python 3 is required but not installed."
+        exit 1
+    }
+
+    if [ ! -d "venv" ]; then
+        echo "Creating virtual environment..."
+        python3 -m venv venv
+    fi
+
+    # Activate virtual environment
+    source venv/bin/activate
+
+    # Install requirements
+    echo "Installing dependencies..."
+    pip install -r requirements.txt
+}
+
+# Function to generate a secure secret key
+generate_secret() {
+    python3 -c 'import secrets; print(secrets.token_hex(32))'
+}
+
+# Parse command line arguments
+MODE="local"
+PORT=5000
+HOST="127.0.0.1"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --remote)
+            MODE="remote"
+            shift
+            ;;
+        --port)
+            PORT="$2"
+            shift 2
+            ;;
+        --host)
+            HOST="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Setup environment
+setup_venv
+
+# Generate secret key if not exists
+if [ ! -f ".env" ]; then
+    echo "Generating secret key..."
+    echo "SECRET_KEY=$(generate_secret)" > .env
+    echo "Environment file created with new secret key"
+fi
+
+# Start server based on mode
+if [ "$MODE" = "remote" ]; then
+    echo "Starting server in remote mode..."
+    echo "Server will be accessible from: $HOST:$PORT"
+    python server.py --host "$HOST" --port "$PORT"
+else
+    echo "Starting server in local mode..."
+    echo "Server will be accessible at: http://localhost:$PORT"
+    python server.py
+fi
+--------------------------------------------------
+File: ./web/landing.html
+--------------------------------------------------
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpiMECoV Analysis Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="nav">
+        <div class="container flex items-center justify-between">
+            <a href="/" class="h2">EpiMECoV</a>
+            <nav aria-label="Main navigation">
+                <ul class="nav-list">
+                    <li><a href="#features" class="nav-link">Features</a></li>
+                    <li><a href="#getting-started" class="nav-link">Getting Started</a></li>
+                    <li><a href="#documentation" class="nav-link">Documentation</a></li>
+                    <li><a href="/dashboard" class="btn btn-primary">Launch Dashboard</a></li>
+                    <li>
+                        <button id="themeToggle" class="btn btn-icon" aria-label="Toggle theme">
+                            <svg class="theme-icon" width="24" height="24" viewBox="0 0 24 24"></svg>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1>Advanced Epigenetic Analysis Platform</h1>
+                    <p class="hero-text">Powerful methylation analysis pipeline for processing and analyzing epigenetic data. Connect remotely or run locally with seamless integration.</p>
+                    <div class="hero-actions">
+                        <a href="/dashboard" class="btn btn-primary btn-lg">Get Started</a>
+                        <a href="#features" class="btn btn-secondary btn-lg">Learn More</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features section-padding">
+            <div class="container">
+                <h2>Platform Features</h2>
+                <div class="grid grid-3 mt-6">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                        </div>
+                        <h3>Secure Remote Access</h3>
+                        <p>Connect to your analysis pipeline from anywhere through our secure web interface.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            </svg>
+                        </div>
+                        <h3>Advanced Pipeline</h3>
+                        <p>Comprehensive methylation analysis with automated quality control and preprocessing.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path d="M4 3h16a2 2 0 0 1 2 2v6a10 10 0 0 1-10 10A10 10 0 0 1 2 11V5a2 2 0 0 1 2-2z"/>
+                            </svg>
+                        </div>
+                        <h3>Interactive Visualizations</h3>
+                        <p>Real-time data visualization with interactive plots and customizable analytics.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Getting Started Section -->
+        <section id="getting-started" class="section-padding bg-secondary">
+            <div class="container">
+                <h2>Getting Started</h2>
+                <div class="grid grid-2 mt-6">
+                    <div class="setup-card">
+                        <h3>Remote Access</h3>
+                        <ol class="setup-steps">
+                            <li>Create an account or sign in</li>
+                            <li>Configure your connection settings</li>
+                            <li>Connect to your running pipeline instance</li>
+                            <li>Start analyzing your data</li>
+                        </ol>
+                        <a href="/register" class="btn btn-primary mt-4">Create Account</a>
+                    </div>
+                    <div class="setup-card">
+                        <h3>Local Setup</h3>
+                        <ol class="setup-steps">
+                            <li>Download the EpiMECoV package</li>
+                            <li>Run the installation script</li>
+                            <li>Start the pipeline master</li>
+                            <li>Access through localhost</li>
+                        </ol>
+                        <a href="/download" class="btn btn-primary mt-4">Download Package</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Documentation Section -->
+        <section id="documentation" class="section-padding">
+            <div class="container">
+                <h2>Documentation</h2>
+                <div class="grid grid-3 mt-6">
+                    <a href="/docs/quickstart" class="doc-card">
+                        <h3>Quick Start Guide</h3>
+                        <p>Get up and running with EpiMECoV in minutes</p>
+                    </a>
+                    <a href="/docs/api" class="doc-card">
+                        <h3>API Reference</h3>
+                        <p>Complete API documentation for developers</p>
+                    </a>
+                    <a href="/docs/examples" class="doc-card">
+                        <h3>Examples</h3>
+                        <p>Sample analyses and use cases</p>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="cta-section section-padding bg-gradient">
+            <div class="container text-center">
+                <h2>Ready to Start Your Analysis?</h2>
+                <p class="mt-4">Join the growing community of researchers using EpiMECoV for their methylation studies.</p>
+                <div class="mt-6">
+                    <a href="/dashboard" class="btn btn-primary btn-lg">Launch Dashboard</a>
+                    <a href="/docs" class="btn btn-secondary btn-lg ml-4">Read Documentation</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="grid grid-4">
+                <div class="footer-col">
+                    <h4>EpiMECoV</h4>
+                    <p>Advanced epigenetic analysis platform for researchers and institutions.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="/dashboard">Dashboard</a></li>
+                        <li><a href="/docs">Documentation</a></li>
+                        <li><a href="/support">Support</a></li>
+                        <li><a href="/blog">Blog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="/tutorials">Tutorials</a></li>
+                        <li><a href="/api">API</a></li>
+                        <li><a href="/downloads">Downloads</a></li>
+                        <li><a href="/community">Community</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Connect</h4>
+                    <ul>
+                        <li><a href="https://github.com/epimecov">GitHub</a></li>
+                        <li><a href="https://twitter.com/epimecov">Twitter</a></li>
+                        <li><a href="/contact">Contact</a></li>
+                        <li><a href="/about">About</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 EpiMECoV. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/theme.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
+--------------------------------------------------
+File: ./web/._landing.html
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/._server.py
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/._requirements.txt
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/._start.sh
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/all_website.py
+--------------------------------------------------
+import os
+
+def save_directory_structure_and_files(root_dir, output_file):
+    with open(output_file, 'w', encoding='utf-8') as out:
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            # Write the directory name
+            rel_path = os.path.relpath(dirpath, root_dir)
+            out.write(f"Directory: {rel_path}\n")
+            out.write("=" * 50 + "\n")
+            
+            # Write file names and contents
+            for file in filenames:
+                file_path = os.path.join(dirpath, file)
+                out.write(f"File: {file_path}\n")  # Include full file path
+                out.write("-" * 50 + "\n")
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        out.write(f.read())
+                except Exception as e:
+                    out.write(f"[Could not read file: {e}]\n")
+                out.write("\n" + "-" * 50 + "\n")
+            out.write("\n")
+
+if __name__ == "__main__":
+    root_directory = "./web"
+    output_text_file = "web_structure.txt"
+    save_directory_structure_and_files(root_directory, output_text_file)
+    print(f"Directory structure and files saved to {output_text_file}")
+
+--------------------------------------------------
+
+Directory: css
+==================================================
+File: ./web/css/reset.css
+--------------------------------------------------
+/* Modern CSS Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove default margin */
+body,
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+/* Set core body defaults */
+body {
+  min-height: 100vh;
+  text-rendering: optimizeSpeed;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Make images easier to work with */
+img,
+picture {
+  max-width: 100%;
+  display: block;
+}
+
+/* Inherit fonts for inputs and buttons */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Remove all animations and transitions for people that prefer not to see them */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Remove list styles on ul, ol elements */
+ul,
+ol {
+  list-style: none;
+}
+
+/* A elements that don't have a class get default styles */
+a:not([class]) {
+  text-decoration-skip-ink: auto;
+}
+
+/* Remove all text decorations on links */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Make sure textareas without a rows attribute are not tiny */
+textarea:not([rows]) {
+  min-height: 10em;
+}
+
+/* Remove all default fieldset styles */
+fieldset {
+  min-width: 0;
+  border: 0;
+}
+--------------------------------------------------
+File: ./web/css/variables.css
+--------------------------------------------------
+:root {
+  /* Colors */
+  --color-primary: #2563eb;
+  --color-primary-light: #3b82f6;
+  --color-primary-dark: #1d4ed8;
+  --color-secondary: #3b82f6;
+  --color-accent: #f59e0b;
+  
+  /* Text Colors */
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+  --color-text-hint: #9ca3af;
+  
+  /* Background Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f3f4f6;
+  --color-bg-tertiary: #f9fafb;
+  --color-bg-accent: #eff6ff;
+  
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-info: #3b82f6;
+  --color-info-light: #dbeafe;
+
+  /* Typography */
+  --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'Monaco', 'Consolas', monospace;
+  --font-size-base: 1rem;
+  --line-height-base: 1.5;
+  
+  /* Font Sizes */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Border Radius */
+  --radius-sm: 0.125rem;
+  --radius-base: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-base: all 0.2s ease-in-out;
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Z-index */
+  --z-negative: -1;
+  --z-elevate: 1;
+  --z-sticky: 100;
+  --z-drawer: 200;
+  --z-dropdown: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-toast: 600;
+  --z-tooltip: 700;
+
+  /* Container Max Widths */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+
+  /* Component Specific */
+  --input-height: 2.5rem;
+  --input-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  --card-border: 1px solid rgba(0, 0, 0, 0.05);
+  --status-box-height: 2.5rem;
+  --progress-bar-height: 8px;
+  --log-max-height: 400px;
+  --visualization-min-height: 300px;
+}
+--------------------------------------------------
+File: ./web/css/styles.css
+--------------------------------------------------
+/* Import other stylesheets */
+@import 'reset.css';
+@import 'variables.css';
+
+/* Base styles */
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-secondary);
+  line-height: var(--line-height-base);
+}
+
+/* Container */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+  max-width: var(--container-lg);
+}
+
+/* Typography */
+h1, .h1 {
+  font-size: var(--text-4xl);
+  line-height: 1.2;
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+  background: linear-gradient(120deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+h2, .h2 {
+  font-size: var(--text-3xl);
+  line-height: 1.3;
+  font-weight: 700;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-primary);
+}
+
+h3, .h3 {
+  font-size: var(--text-xl);
+  line-height: 1.4;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+  color: var(--color-primary);
+}
+
+h4, .h4 {
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+p {
+  margin-bottom: var(--space-4);
+}
+
+.section-header {
+  margin-bottom: var(--space-6);
+}
+
+.section-description {
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  max-width: 700px;
+}
+
+/* Navigation */
+.nav {
+  background-color: var(--color-bg-primary);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding: var(--space-3) 0;
+  backdrop-filter: blur(8px);
+  background-color: rgba(255, 255, 255, 0.9);
+  height: var(--nav-height);
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  color: var(--color-text-primary);
+}
+
+.logo-text {
+  background: linear-gradient(120deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-list {
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+}
+
+.nav-link {
+  color: var(--color-text-secondary);
+  transition: var(--transition-base);
+  font-weight: 500;
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--color-primary);
+  transition: var(--transition-base);
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+  width: 100%;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--color-primary);
+}
+
+/* Cards */
+.card {
+  background-color: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-base);
+  padding: var(--space-6);
+  transition: var(--transition-base);
+  border: 1px solid var(--color-border);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.card-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge.success {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badge.info {
+  background-color: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.badge.warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.badge.error {
+  background-color: var(--color-error-light);
+  color: var(--color-error);
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: var(--space-6);
+}
+
+label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-primary);
+  transition: var(--transition-base);
+  font-size: var(--text-base);
+  height: var(--input-height);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--input-focus-ring);
+}
+
+.input-hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.input-error {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+.form-actions {
+  margin-top: var(--space-6);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: var(--transition-smooth);
+  cursor: pointer;
+  border: none;
+  font-size: var(--text-base);
+  gap: var(--space-2);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  background-color: var(--color-text-secondary);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.btn-secondary {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-primary);
+}
+
+.btn-icon {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.btn-icon:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-primary);
+}
+
+.btn-sm {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+/* Progress Bar */
+.progress-container {
+  width: 100%;
+  background-color: var(--
+--------------------------------------------------
+File: ./web/css/._styles.css
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+
+Directory: js
+==================================================
+File: ./web/js/main.js
+--------------------------------------------------
+import connectionManager from './connection.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
+    const configForm = document.getElementById('configForm');
+    const startPipelineBtn = document.getElementById('startPipeline');
+    const progressBar = document.querySelector('.progress');
+    const progressText = document.getElementById('progressText');
+    const currentStep = document.getElementById('currentStep');
+    const elapsedTime = document.getElementById('elapsedTime');
+    const outputLog = document.querySelector('#outputLog pre code');
+    
+    // Pipeline state
+    let pipelineRunning = false;
+    let startTime = null;
+    let elapsedTimer = null;
+    let currentStepNumber = 0;
+    const totalSteps = 16;
+
+    // WebSocket state
+    let ws = null;
+    let wsReconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const reconnectDelay = 1000; // Start with 1 second
+
+    // Input validation state
+    const requiredInputs = document.querySelectorAll('input[required], select[required]');
+    let formValid = false;
+
+    function setupWebSocket() {
+        if (ws) {
+            ws.close();
+        }
+
+        ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        ws.onopen = () => {
+            wsReconnectAttempts = 0;
+            showNotification('Connected', 'WebSocket connection established', 'success');
+            updateConnectionStatus('connected');
+        };
+        
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+                appendToLog('Error: Failed to parse server message');
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            updateConnectionStatus('error');
+            appendToLog('Error: WebSocket connection error. Some real-time updates may not be available.');
+        };
+
+        ws.onclose = () => {
+            updateConnectionStatus('disconnected');
+            if (wsReconnectAttempts < maxReconnectAttempts) {
+                wsReconnectAttempts++;
+                const delay = Math.min(reconnectDelay * Math.pow(2, wsReconnectAttempts - 1), 30000);
+                showNotification('Disconnected', `Reconnecting in ${delay/1000} seconds...`, 'warning');
+                setTimeout(setupWebSocket, delay);
+            } else {
+                showNotification('Connection Failed', 'Unable to establish WebSocket connection', 'error');
+            }
+        };
+    }
+
+    function updateConnectionStatus(status) {
+        const statusIndicator = document.getElementById('connectionStatus');
+        if (statusIndicator) {
+            statusIndicator.className = `connection-status ${status}`;
+            statusIndicator.setAttribute('title', `Connection: ${status}`);
+        }
+    }
+
+    // Form validation
+    function validateForm() {
+        formValid = true;
+        let firstError = null;
+
+        requiredInputs.forEach(input => {
+            const value = input.value.trim();
+            const isValid = validateInput(input, value);
+            
+            if (!isValid && !firstError) {
+                firstError = input;
+            }
+            
+            formValid = formValid && isValid;
+        });
+
+        startPipelineBtn.disabled = !formValid;
+
+        if (firstError) {
+            firstError.focus();
+        }
+
+        return formValid;
+    }
+
+    function validateInput(input, value) {
+        const isEmpty = !value;
+        const parent = input.closest('.form-group');
+        
+        if (isEmpty) {
+            showInputError(input, 'This field is required');
+            parent?.classList.add('has-error');
+            return false;
+        }
+
+        // Path validation for condition inputs
+        if (input.id.startsWith('condition')) {
+            if (!isValidPath(value)) {
+                showInputError(input, 'Please enter a valid directory path');
+                parent?.classList.add('has-error');
+                return false;
+            }
+        }
+
+        hideInputError(input);
+        parent?.classList.remove('has-error');
+        return true;
+    }
+
+    function isValidPath(path) {
+        // Basic path validation - can be expanded based on requirements
+        return path.length > 0 && !path.includes('*') && !path.includes('|');
+    }
+
+    requiredInputs.forEach(input => {
+        input.addEventListener('input', () => {
+            validateInput(input, input.value.trim());
+            validateForm();
+        });
+
+        input.addEventListener('blur', () => {
+            validateInput(input, input.value.trim());
+        });
+
+        input.addEventListener('focus', () => {
+            hideInputError(input);
+        });
+    });
+
+    function showInputError(input, message) {
+        let errorDiv = input.parentElement.querySelector('.input-error');
+        if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'input-error';
+            input.parentElement.appendChild(errorDiv);
+        }
+        errorDiv.textContent = message;
+        errorDiv.style.opacity = '1';
+    }
+
+    function hideInputError(input) {
+        const errorDiv = input.parentElement.querySelector('.input-error');
+        if (errorDiv) {
+            errorDiv.style.opacity = '0';
+            setTimeout(() => errorDiv.remove(), 300);
+        }
+    }
+
+    // Form submission
+    configForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!pipelineRunning && validateForm()) {
+            startPipeline();
+        }
+    });
+
+    startPipelineBtn.addEventListener('click', () => {
+        if (!pipelineRunning && validateForm()) {
+            configForm.requestSubmit();
+        }
+    });
+
+    // Connect to pipeline server
+    connectionManager.addListener((event, data) => {
+        switch (event) {
+            case 'connected':
+                showNotification('Connected', 'Successfully connected to pipeline server', 'success');
+                break;
+            case 'disconnected':
+                showNotification('Disconnected', 'Lost connection to pipeline server', 'warning');
+                break;
+            case 'message':
+                handleWebSocketMessage(data);
+                break;
+            case 'error':
+                showNotification('Error', 'Connection error occurred', 'error');
+                break;
+        }
+    });
+
+    // Pipeline control
+    async function startPipeline() {
+        const config = {
+            condition1: document.getElementById('condition1').value,
+            condition2: document.getElementById('condition2').value,
+            condition3: document.getElementById('condition3').value,
+            startStep: document.getElementById('startStep').value
+        };
+
+        try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            // Add authentication token for remote connections
+            if (connectionManager.connectionType === 'remote' && connectionManager.authToken) {
+                headers['Authorization'] = `Bearer ${connectionManager.authToken}`;
+            }
+
+            // Save configuration
+            const configResponse = await fetch('/api/config', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(config)
+            });
+
+            if (!configResponse.ok) {
+                throw new Error('Failed to save configuration');
+            }
+
+            // Start pipeline
+            const startResponse = await fetch('/api/pipeline/start', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(config)
+            });
+
+            if (!startResponse.ok) {
+                throw new Error('Failed to start pipeline');
+            }
+
+            // Update UI state
+            pipelineRunning = true;
+            startPipelineBtn.textContent = 'Running...';
+            startPipelineBtn.disabled = true;
+            startTime = Date.now();
+            currentStepNumber = parseInt(config.startStep);
+            
+            // Start elapsed time counter
+            startElapsedTimer();
+            
+            // Clear previous output
+            clearOutput();
+            
+            // Reset visualizations
+            resetVisualizations();
+            
+            appendToLog('Pipeline started successfully');
+            showNotification('Pipeline Started', 'Analysis is now running', 'success');
+
+        } catch (error) {
+            appendToLog(`Error: ${error.message}`);
+            showNotification('Error', error.message, 'error');
+            resetPipelineState();
+        }
+    }
+
+    function clearOutput() {
+        outputLog.innerHTML = '';
+    }
+
+    function resetVisualizations() {
+        document.querySelectorAll('.visualization-container').forEach(container => {
+            const img = container.querySelector('img');
+            const placeholder = container.querySelector('.placeholder');
+            
+            if (img) img.classList.add('hidden');
+            if (placeholder) placeholder.classList.remove('hidden');
+            
+            container.classList.remove('loading', 'loaded', 'error');
+        });
+    }
+
+    // WebSocket message handler
+    function handleWebSocketMessage(data) {
+        try {
+            switch (data.type) {
+                case 'step':
+                    updateStep(data.step, data.message);
+                    break;
+                case 'progress':
+                    updateProgress(data.current, data.total);
+                    break;
+                case 'output':
+                    appendToLog(data.message);
+                    break;
+                case 'result':
+                    updateResults(data.results);
+                    break;
+                case 'visualization':
+                    updateVisualization(data.visualizationType, data.path);
+                    break;
+                case 'complete':
+                    pipelineComplete();
+                    break;
+                case 'error':
+                    handleError(data.message);
+                    break;
+                case 'summary':
+                    updateSummaryStats(data.summary);
+                    break;
+                case 'findings':
+                    updateKeyFindings(data.findings);
+                    break;
+                case 'download':
+                    handleDownloadProgress(data);
+                    break;
+                default:
+                    console.warn('Unknown message type:', data.type);
+            }
+        } catch (error) {
+            console.error('Error handling WebSocket message:', error);
+            appendToLog(`Error processing server message: ${error.message}`);
+        }
+    }
+
+    function updateSummaryStats(summary) {
+        const animateValue = (elementId, value, suffix = '') => {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            let startValue = parseInt(element.textContent) || 0;
+            const endValue = parseInt(value);
+            const duration = 1000;
+            const steps = 60;
+            const stepValue = (endValue - startValue) / steps;
+            
+            let currentStep = 0;
+            
+            const animation = setInterval(() => {
+                currentStep++;
+                const currentValue = Math.floor(startValue + (stepValue * currentStep));
+                element.textContent = currentValue + suffix;
+                
+                if (currentStep >= steps) {
+                    element.textContent = value + suffix;
+                    clearInterval(animation);
+                }
+            }, duration / steps);
+        };
+        
+        animateValue('totalSamples', summary.totalSamples);
+        animateValue('featuresAnalyzed', summary.featuresAnalyzed);
+        animateValue('overallQuality', summary.qualityScore, '%');
+    }
+
+    function updateKeyFindings(findings) {
+        const findingsContainer = document.getElementById('keyFindings');
+        findingsContainer.innerHTML = '';
+        
+        findings.forEach(finding => {
+            const findingElement = document.createElement('div');
+            findingElement.className = `finding-item ${finding.type || ''}`;
+            findingElement.innerHTML = `
+                <p>${finding.message}</p>
+                ${finding.value ? `<strong>${finding.value}</strong>` : ''}
+            `;
+            findingsContainer.appendChild(findingElement);
+        });
+    }
+
+    function handleDownloadProgress(data) {
+        const button = document.querySelector(`button[data-file="${data.filename}"]`);
+        if (!button) return;
+        
+        if (data.status === 'preparing') {
+            button.disabled = true;
+            button.innerHTML = '<span>Preparing...</span>';
+        } else if (data.status === 'ready') {
+            button.disabled = false;
+            button.innerHTML = '<span>Download</span>';
+        } else if (data.status === 'error') {
+            button.disabled = false;
+            button.innerHTML = '<span>Retry</span>';
+            showNotification('Download Error', data.message, 'error');
+        }
+    }
+
+    // UI update functions
+    function updateStep(step, message) {
+        currentStepNumber = step;
+        
+        const stepElement = document.getElementById('currentStep');
+        stepElement.textContent = message;
+        stepElement.classList.add('status-update');
+        
+        // Add status class based on message content
+        if (message.toLowerCase().includes('error')) {
+            stepElement.classList.add('status-error');
+        } else if (message.toLowerCase().includes('complete')) {
+            stepElement.classList.add('status-success');
+        } else {
+            stepElement.classList.add('status-running');
+        }
+        
+        setTimeout(() => {
+            stepElement.classList.remove('status-update');
+        }, 300);
+        
+        updateProgress(step, totalSteps);
+    }
+
+    function updateProgress(current, total) {
+        const percentage = (current / total) * 100;
+        progressBar.style.width = `${percentage}%`;
+        progressText.textContent = `${current}/${total} steps completed`;
+        
+        // Update progress bar color based on completion
+        progressBar.classList.remove('complete', 'almost-complete', 'in-progress');
+        if (percentage === 100) {
+            progressBar.classList.add('complete');
+        } else if (percentage >= 66) {
+            progressBar.classList.add('almost-complete');
+        } else {
+            progressBar.classList.add('in-progress');
+        }
+    }
+
+    function appendToLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        const formattedMessage = `[${timestamp}] ${message}`;
+        
+        const logLine = document.createElement('div');
+        logLine.className = 'log-line';
+        
+        // Add color coding based on message type
+        if (message.toLowerCase().includes('error')) {
+            logLine.classList.add('error-message');
+        } else if (message.toLowerCase().includes('warning')) {
+            logLine.classList.add('warning-message');
+        } else if (message.toLowerCase().includes('success') || 
+                   message.toLowerCase().includes('complete')) {
+            logLine.classList.add('success-message');
+        }
+        
+        logLine.textContent = formattedMessage;
+        outputLog.appendChild(logLine);
+        
+        // Auto-scroll to bottom
+        const container = outputLog.parentElement;
+        container.scrollTop = container.scrollHeight;
+        
+        // Limit log size
+        while (outputLog.childNodes.length > 1000) {
+            outputLog.removeChild(outputLog.firstChild);
+        }
+    }
+
+    function updateResults(results) {
+        // Update metrics with animation
+        function animateValue(element, value) {
+            if (!element) return;
+            
+            element.classList.add('updating');
+            
+            // Format value based on type
+            let displayValue = value;
+            if (typeof value === 'number') {
+                displayValue = value.toFixed(4);
+            }
+            
+            element.textContent = displayValue;
+            
+            setTimeout(() => {
+                element.classList.remove('updating');
+            }, 300);
+        }
+
+        try {
+            if (results.qualityMetrics) {
+                animateValue(document.getElementById('qualityScore'), 
+                           results.qualityMetrics.score);
+                animateValue(document.getElementById('detectionPvalue'), 
+                           results.qualityMetrics.pvalue);
+            }
+            
+            if (results.classification) {
+                animateValue(document.getElementById('accuracy'), 
+                           results.classification.accuracy);
+                animateValue(document.getElementById('f1Score'), 
+                           results.classification.f1);
+            }
+            
+            if (results.features) {
+                animateValue(document.getElementById('selectedFeatures'), 
+                           results.features.selected);
+                animateValue(document.getElementById('significantDMPs'), 
+                           results.features.significant);
+            }
+        } catch (error) {
+            console.error('Error updating results:', error);
+            appendToLog(`Error updating results: ${error.message}`);
+        }
+    }
+
+    function updateVisualization(type, path) {
+        const container = document.getElementById(`${type}Plot`);
+        if (!container) return;
+
+        const img = container.querySelector('img');
+        const placeholder = container.querySelector('.placeholder');
+        
+        // Add loading state
+        container.classList.add('loading');
+        container.classList.remove('loaded', 'error');
+        
+        // Load new image
+        const newImg = new Image();
+        newImg.onload = () => {
+            img.src = path;
+            img.classList.remove('hidden');
+            if (placeholder) {
+                placeholder.classList.add('hidden');
+            }
+            container.classList.remove('loading');
+            container.classList.add('loaded');
+        };
+        
+        newImg.onerror = () => {
+            console.error(`Failed to load visualization: ${path}`);
+            container.classList.remove('loading');
+            container.classList.add('error');
+            if (placeholder) {
+                placeholder.classList.remove('hidden');
+                placeholder.innerHTML = `
+                    <svg class="error-icon" width="48" height="48" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    <p>Failed to load visualization</p>
+                `;
+            }
+        };
+        
+        newImg.src = path;
+    }
+
+    function startElapsedTimer() {
+        elapsedTimer = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            elapsedTime.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    function pipelineComplete() {
+        appendToLog('Pipeline execution completed successfully!');
+        showNotification('Pipeline Complete', 'Analysis has finished successfully', 'success');
+        resetPipelineState();
+    }
+
+    function handleError(message) {
+        appendToLog(`Error: ${message}`);
+        showNotification('Pipeline Error', message, 'error');
+        resetPipelineState();
+    }
+
+    function resetPipelineState() {
+        pipelineRunning = false;
+        startPipelineBtn.textContent = 'Start Analysis';
+        startPipelineBtn.disabled = false;
+        clearInterval(elapsedTimer);
+    }
+
+    function showNotification(title, message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-header">
+                <h4>${title}</h4>
+                <button class="notification-close">&times;</button>
+            </div>
+            <p>${message}</p>
+        `;
+        
+        // Add close button handler
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        });
+        
+        // Add to document
+        document.body.appendChild(notification);
+        
+        // Trigger animation
+        setTimeout(() => notification.classList.add('show'), 10);
+        
+        // Auto-remove after delay
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 5000);
+    }
+
+    // Navigation
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    function highlightNavLink() {
+        const scrollPosition = window.scrollY + 100;
+
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionBottom = sectionTop + section.offsetHeight;
+            const sectionId = section.getAttribute('id');
+
+            if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === `#${sectionId}`) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    }
+
+    // Smooth scrolling
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    window.addEventListener('scroll', highlightNavLink);
+    
+    // Initialize WebSocket connection
+    setupWebSocket();
+});
+--------------------------------------------------
+File: ./web/js/theme.js
+--------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle.querySelector('.theme-icon');
+    
+    // Check for saved theme preference or default to light
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(savedTheme);
+    
+    // Update icon based on current theme
+    function updateThemeIcon(theme) {
+        themeIcon.innerHTML = theme === 'dark' 
+            ? '<path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1-8.313-12.454z"></path>' // moon icon
+            : '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z"/><path d="M12 4V2M12 22v-2M4.93 4.93L3.51 3.51M20.49 20.49l-1.42-1.42M2 12H0M22 12h-2M4.93 19.07l-1.42 1.42M20.49 3.51l-1.42 1.42"/>'; // sun icon
+    }
+    
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        updateThemeIcon(theme);
+    }
+    
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+    });
+});
+--------------------------------------------------
+File: ./web/js/._theme.js
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/js/charts.js
+--------------------------------------------------
+// Initialize interactive charts
+document.addEventListener('DOMContentLoaded', () => {
+    // Set default Chart.js options for theme compatibility
+    Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary');
+    Chart.defaults.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-border');
+    
+    // Update charts when theme changes
+    const observer = new MutationObserver(() => {
+        updateChartsTheme();
+    });
+    
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+    });
+    
+    function updateChartsTheme() {
+        Chart.defaults.color = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary');
+        Chart.defaults.borderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-border');
+        Object.values(charts).forEach(chart => chart.update());
+    }
+    
+    // Store chart instances
+    const charts = {};
+    
+    // Initialize charts when data is received
+    function initializeCharts(data) {
+        if (data.pca) {
+            initializePCAChart(data.pca);
+        }
+        if (data.tsne) {
+            initializeTSNEChart(data.tsne);
+        }
+        updateChartsTheme();
+    }
+    
+    function initializePCAChart(pcaData) {
+        const ctx = document.getElementById('pcaCanvas').getContext('2d');
+        charts.pca = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: pcaData.groups.map((group, i) => ({
+                    label: group.name,
+                    data: group.points,
+                    backgroundColor: group.color,
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'PCA Analysis'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const point = context.raw;
+                                return `Sample: ${point.label}
+                                        PC1: ${point.x.toFixed(2)}
+                                        PC2: ${point.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'PC1'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'PC2'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function initializeTSNEChart(tsneData) {
+        const ctx = document.getElementById('tsneCanvas').getContext('2d');
+        charts.tsne = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: tsneData.groups.map((group, i) => ({
+                    label: group.name,
+                    data: group.points,
+                    backgroundColor: group.color,
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 't-SNE Analysis'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const point = context.raw;
+                                return `Sample: ${point.label}
+                                        t-SNE1: ${point.x.toFixed(2)}
+                                        t-SNE2: ${point.y.toFixed(2)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 't-SNE1'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 't-SNE2'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Handle tab switching
+    const tabs = document.querySelectorAll('.tab');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetId = tab.getAttribute('data-tab');
+            
+            // Update active states
+            tabs.forEach(t => t.classList.remove('active'));
+            tabPanes.forEach(p => p.classList.remove('active'));
+            
+            tab.classList.add('active');
+            document.getElementById(`${targetId}Pane`).classList.add('active');
+            
+            // Trigger chart resize if switching to visualization tab
+            if (targetId === 'visualization') {
+                Object.values(charts).forEach(chart => chart.resize());
+            }
+        });
+    });
+    
+    // Handle downloads
+    document.querySelectorAll('.download-list button').forEach(button => {
+        button.addEventListener('click', async () => {
+            const filename = button.getAttribute('data-file');
+            try {
+                const response = await fetch(`/api/download/${filename}`);
+                if (!response.ok) throw new Error('Download failed');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (error) {
+                console.error('Download error:', error);
+                showNotification('Download Failed', 'Failed to download the file. Please try again.', 'error');
+            }
+        });
+    });
+});
+--------------------------------------------------
+File: ./web/js/._charts.js
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/js/._main.js
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+File: ./web/js/connection.js
+--------------------------------------------------
+class ConnectionManager {
+    constructor() {
+        this.serverUrl = '';
+        this.socket = null;
+        this.isConnected = false;
+        this.authToken = localStorage.getItem('authToken');
+        this.connectionType = localStorage.getItem('connectionType') || 'local';
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.listeners = new Set();
+        
+        // Initialize connection indicator
+        this.indicator = document.createElement('div');
+        this.indicator.className = 'connection-indicator';
+        this.indicator.textContent = 'Disconnected';
+        document.querySelector('.nav-list').appendChild(this.indicator);
+        
+        this.initializeUI();
+    }
+
+    initializeUI() {
+        // Add connection type switcher
+        const switcher = document.createElement('div');
+        switcher.className = 'connection-switcher';
+        switcher.innerHTML = `
+            <select id="connectionType" class="connection-select">
+                <option value="local">Local Connection</option>
+                <option value="remote">Remote Connection</option>
+            </select>
+        `;
+        document.querySelector('.nav-list').insertBefore(switcher, this.indicator);
+
+        const select = switcher.querySelector('select');
+        select.value = this.connectionType;
+        select.addEventListener('change', (e) => this.handleConnectionTypeChange(e.target.value));
+
+        // Initialize connection modal
+        this.createConnectionModal();
+    }
+
+    createConnectionModal() {
+        const modal = document.createElement('div');
+        modal.className = 'auth-modal hidden';
+        modal.innerHTML = `
+            <h3>Connect to Remote Server</h3>
+            <form id="connectionForm">
+                <div class="form-group">
+                    <label for="serverUrl">Server URL</label>
+                    <input type="url" id="serverUrl" required placeholder="https://your-server.com">
+                </div>
+                <div class="form-group">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Connect</button>
+            </form>
+        `;
+        document.body.appendChild(modal);
+
+        const form = modal.querySelector('form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.connectToRemote(
+                form.querySelector('#serverUrl').value,
+                form.querySelector('#apiKey').value
+            );
+        });
+    }
+
+    async connectToRemote(url, apiKey) {
+        try {
+            const response = await fetch(`${url}/api/auth`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ apiKey })
+            });
+
+            if (!response.ok) {
+                throw new Error('Authentication failed');
+            }
+
+            const { token } = await response.json();
+            this.authToken = token;
+            localStorage.setItem('authToken', token);
+            this.serverUrl = url;
+            localStorage.setItem('serverUrl', url);
+
+            this.setupWebSocket();
+            document.querySelector('.auth-modal').classList.add('hidden');
+            showNotification('Connected', 'Successfully connected to remote server', 'success');
+        } catch (error) {
+            showNotification('Connection Failed', error.message, 'error');
+        }
+    }
+
+    setupWebSocket() {
+        if (this.socket) {
+            this.socket.close();
+        }
+
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = this.connectionType === 'local' 
+            ? `${wsProtocol}//${window.location.host}/ws`
+            : `${wsProtocol}//${new URL(this.serverUrl).host}/ws`;
+
+        this.socket = new WebSocket(wsUrl);
+        
+        this.socket.onopen = () => {
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
+            this.updateConnectionStatus('connected');
+            this.notifyListeners('connected');
+
+            // Send authentication if remote
+            if (this.connectionType === 'remote' && this.authToken) {
+                this.socket.send(JSON.stringify({
+                    type: 'auth',
+                    token: this.authToken
+                }));
+            }
+        };
+
+        this.socket.onclose = () => {
+            this.isConnected = false;
+            this.updateConnectionStatus('disconnected');
+            this.notifyListeners('disconnected');
+
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
+                setTimeout(() => this.setupWebSocket(), delay);
+            }
+        };
+
+        this.socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.notifyListeners('error', error);
+        };
+
+        this.socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.notifyListeners('message', data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+    }
+
+    updateConnectionStatus(status) {
+        this.indicator.className = `connection-indicator ${status}`;
+        this.indicator.textContent = status === 'connected' ? 'Connected' : 'Disconnected';
+    }
+
+    handleConnectionTypeChange(type) {
+        this.connectionType = type;
+        localStorage.setItem('connectionType', type);
+
+        if (type === 'remote' && !this.authToken) {
+            document.querySelector('.auth-modal').classList.remove('hidden');
+        } else {
+            this.setupWebSocket();
+        }
+    }
+
+    addListener(callback) {
+        this.listeners.add(callback);
+    }
+
+    removeListener(callback) {
+        this.listeners.delete(callback);
+    }
+
+    notifyListeners(event, data) {
+        this.listeners.forEach(callback => callback(event, data));
+    }
+
+    sendMessage(message) {
+        if (this.isConnected) {
+            this.socket.send(JSON.stringify(message));
+        } else {
+            console.error('Cannot send message: Not connected');
+            showNotification('Error', 'Not connected to server', 'error');
+        }
+    }
+}
+
+// Create and export connection manager instance
+const connectionManager = new ConnectionManager();
+export default connectionManager;
+--------------------------------------------------
+File: ./web/js/._connection.js
+--------------------------------------------------
+[Could not read file: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte]
+
+--------------------------------------------------
+
