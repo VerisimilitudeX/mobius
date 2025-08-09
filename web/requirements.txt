@@ -2,7 +2,7 @@ aiohttp==3.9.1
 websockets==12.0
 watchdog==3.0.0
 Flask==2.0.1
-Flask-CORS==3.0.10
+Flask-CORS==6.0.0
 Flask-SocketIO==5.1.1
 PyJWT==2.3.0
 python-socketio==5.5.0
