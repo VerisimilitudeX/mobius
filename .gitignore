@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.pickle
+*.pkl
+
+# Virtual environments
+.venv/
+venv/
+.webenv/
+ENV/
+env/
+
+# Build / Dist
+build/
+dist/
+
+# Data and experiment artifacts (not for source control)
+wandb/
+results/
+processed_data/
+data/
+
+# LaTeX intermediates
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.run.xml
+*.synctex.gz
+
+# Node
+node_modules/
