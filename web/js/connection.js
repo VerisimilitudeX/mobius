@@ -46,7 +46,7 @@ class ConnectionManager {
             <form id="connectionForm">
                 <div class="form-group">
                     <label for="serverUrl">Server URL</label>
-                    <input type="url" id="serverUrl" required placeholder="https://your-server.com">
+                    <input type="url" id="serverUrl" required placeholder="https://mobius.dnanalyzer.org">
                 </div>
                 <div class="form-group">
                     <label for="apiKey">API Key</label>

@@ -28,45 +28,45 @@ document.addEventListener('DOMContentLoaded', () => {
     let formValid = false;
 
     function setupWebSocket() {
-        if (ws) {
-            ws.close();
+        // Use Socket.IO if available for compatibility with backend server
+        if (window.io) {
+            try {
+                const socket = window.io({ transports: ['websocket', 'polling'] });
+
+                socket.on('connect', () => {
+                    wsReconnectAttempts = 0;
+                    showNotification('Connected', 'Real-time connection established', 'success');
+                    updateConnectionStatus('connected');
+                });
+
+                socket.on('disconnect', () => {
+                    updateConnectionStatus('disconnected');
+                });
+
+                socket.on('output', (data) => {
+                    handleWebSocketMessage({ type: 'output', message: data.message || '' });
+                });
+
+                socket.on('complete', (data) => {
+                    handleWebSocketMessage({ type: 'complete', message: data.message || 'Pipeline complete' });
+                });
+
+                socket.on('error', (data) => {
+                    handleWebSocketMessage({ type: 'error', message: (data && data.message) || 'Error' });
+                });
+
+                // Expose minimal ws-like API for the rest of this module
+                ws = {
+                    close: () => socket.close()
+                };
+                return;
+            } catch (err) {
+                console.warn('Socket.IO not available, falling back to no live stream.', err);
+            }
         }
 
-        ws = new WebSocket(`ws://${window.location.host}/ws`);
-        
-        ws.onopen = () => {
-            wsReconnectAttempts = 0;
-            showNotification('Connected', 'WebSocket connection established', 'success');
-            updateConnectionStatus('connected');
-        };
-        
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                handleWebSocketMessage(data);
-            } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
-                appendToLog('Error: Failed to parse server message');
-            }
-        };
-
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            updateConnectionStatus('error');
-            appendToLog('Error: WebSocket connection error. Some real-time updates may not be available.');
-        };
-
-        ws.onclose = () => {
-            updateConnectionStatus('disconnected');
-            if (wsReconnectAttempts < maxReconnectAttempts) {
-                wsReconnectAttempts++;
-                const delay = Math.min(reconnectDelay * Math.pow(2, wsReconnectAttempts - 1), 30000);
-                showNotification('Disconnected', `Reconnecting in ${delay/1000} seconds...`, 'warning');
-                setTimeout(setupWebSocket, delay);
-            } else {
-                showNotification('Connection Failed', 'Unable to establish WebSocket connection', 'error');
-            }
-        };
+        // Fallback: no live stream; logs will appear after pipeline completes when fetched
+        updateConnectionStatus('disconnected');
     }
 
     function updateConnectionStatus(status) {

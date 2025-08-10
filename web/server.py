@@ -48,15 +48,17 @@ def token_required(f):
 # Serve static files
 @app.route('/')
 def serve_landing():
-    return send_from_directory('web', 'landing.html')
+    # server.py is in the web directory; serve files from current directory
+    return send_from_directory('.', 'landing.html')
 
 @app.route('/dashboard')
 def serve_dashboard():
-    return send_from_directory('web', 'dashboard.html')
+    # Serve the main dashboard UI
+    return send_from_directory('.', 'index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory('web', path)
+    return send_from_directory('.', path)
 
 # API Routes
 @app.route('/api/auth', methods=['POST'])
@@ -71,18 +73,61 @@ def authenticate():
     return jsonify({'token': token})
 
 @app.route('/api/config', methods=['POST'])
-@token_required
 def save_config():
-    config = request.json
-    # Save configuration logic here
-    return jsonify({'message': 'Configuration saved'})
+    """Persist dashboard configuration for the R pipeline to consume."""
+    try:
+        config = request.json or {}
+        # Stronger validation
+        required = ['condition1', 'condition2', 'condition3']
+        missing = [k for k in required if not config.get(k)]
+        if missing:
+            return jsonify({'message': f'Missing fields: {", ".join(missing)}'}), 400
+
+        # Save for run_pipeline_master.R (reads dashboard_config.json in web_mode)
+        import json
+        with open('dashboard_config.json', 'w') as f:
+            json.dump({
+                'condition1': config['condition1'],
+                'condition2': config['condition2'],
+                'condition3': config['condition3'],
+                'startStep': int(config.get('startStep', 0))
+            }, f, indent=2)
+
+        return jsonify({'message': 'Configuration saved'})
+    except Exception as e:
+        return jsonify({'message': f'Failed to save config: {e}'}), 500
 
 @app.route('/api/pipeline/start', methods=['POST'])
-@token_required
 def start_pipeline():
-    config = request.json
-    # Start pipeline logic here
-    return jsonify({'message': 'Pipeline started'})
+    """Start the R pipeline and stream progress to WebSocket clients."""
+    try:
+        # Run the pipeline in a subprocess
+        import subprocess
+        import threading
+        import json
+
+        payload = request.json or {}
+        # Ensure config exists on disk for web_mode
+        if not os.path.exists('dashboard_config.json'):
+            with open('dashboard_config.json', 'w') as f:
+                json.dump(payload, f, indent=2)
+
+        cmd = ['Rscript', 'src/original/run_pipeline_master.R', str(payload.get('startStep', 0)), '--web_mode=TRUE']
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+        def stream_output():
+            try:
+                for line in proc.stdout:  # type: ignore[attr-defined]
+                    socketio.emit('output', {'type': 'output', 'message': line})
+            finally:
+                code = proc.wait()
+                status = 'complete' if code == 0 else 'error'
+                socketio.emit(status, {'type': status, 'message': f'Pipeline {status}', 'code': code})
+
+        threading.Thread(target=stream_output, daemon=True).start()
+        return jsonify({'message': 'Pipeline started'})
+    except Exception as e:
+        return jsonify({'message': f'Failed to start pipeline: {e}'}), 500
 
 # WebSocket Events
 @socketio.on('connect')
