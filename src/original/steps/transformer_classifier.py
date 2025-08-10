@@ -7,6 +7,7 @@ Piyush Acharya, Derek Jacoby
 
 import os
 import sys
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -41,10 +42,11 @@ class MethylationChunkedDataset(Dataset):
     Loads a CSV with row=sample, columns=features + Condition.
     Splits each sample's feature vector into chunked tokens of size CHUNK_SIZE.
     """
-    def __init__(self, csv_path):
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"CSV not found: {csv_path}")
-        df = pd.read_csv(csv_path, index_col=0)
+    def __init__(self, csv_path=None, df: pd.DataFrame | None = None):
+        if df is None:
+            if csv_path is None or not os.path.exists(csv_path):
+                raise FileNotFoundError(f"CSV not found: {csv_path}")
+            df = pd.read_csv(csv_path, index_col=0)
         if "Condition" not in df.columns:
             raise ValueError("No 'Condition' column found.")
         self.classes = sorted(df["Condition"].unique())
@@ -414,6 +416,15 @@ def finetune_classifier(model, loader_train, loader_val, device, epochs=FINETUNE
 # Main Training Pipeline
 # ----------------------------
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--csv", type=str, default=None, help="Path to filtered_biomarker_matrix.csv (samples x features incl. Condition)")
+    parser.add_argument("--hf-dataset", dest="hf_dataset", type=str, default=None,
+                        help="HF dataset repo id, e.g. 'user/methylation-betas' (overrides --csv)")
+    parser.add_argument("--hf-split", dest="hf_split", type=str, default="train", help="HF split to load")
+    parser.add_argument("--hf-config", dest="hf_config", type=str, default=None, help="HF config name (optional)")
+    parser.add_argument("--hf-data-files", dest="hf_data_files", type=str, default=None,
+                        help="CSV path/URL for datasets 'csv' loader (optional)")
+    args = parser.parse_args(args=[] if hasattr(sys, 'ps1') else None)
     logging.basicConfig(filename='results/transformer_classifier.log',level=logging.INFO, format='[%(levelname)s] %(message)s')
     logging.info("entered main")
     # Initialize wandb
@@ -437,14 +448,34 @@ def main():
     )
     logging.info("wandb init")
     
-    tmpdir = os.environ['SLURM_TMPDIR']
-    logging.info(tmpdir)
-    csv_path = tmpdir + "/filtered_biomarker_matrix.csv"
-    if not os.path.exists(csv_path):
-        logging.error(f"No CSV found: {csv_path}")
-        sys.exit(1)
-    logging.info("csv")
-    dataset = MethylationChunkedDataset(csv_path)
+    # Prefer HF dataset if provided, else CSV, else SLURM_TMPDIR fallback
+    df = None
+    if args.hf_dataset or args.hf_data_files:
+        try:
+            from src.utils.hf_data import load_methylation_dataframe
+        except Exception:
+            from pathlib import Path
+            import sys as _sys
+            _sys.path.append(str(Path(__file__).resolve().parents[3]))
+            from src.utils.hf_data import load_methylation_dataframe  # type: ignore
+        df = load_methylation_dataframe(
+            hf_dataset=args.hf_dataset,
+            hf_split=args.hf_split,
+            hf_config=args.hf_config,
+            data_files=args.hf_data_files,
+            csv_path=None,
+        )
+        dataset = MethylationChunkedDataset(df=df)
+    else:
+        csv_path = args.csv
+        if csv_path is None:
+            tmpdir = os.environ.get('SLURM_TMPDIR')
+            if tmpdir:
+                csv_path = os.path.join(tmpdir, "filtered_biomarker_matrix.csv")
+        if not csv_path or not os.path.exists(csv_path):
+            logging.error(f"No CSV found: {csv_path}")
+            sys.exit(1)
+        dataset = MethylationChunkedDataset(csv_path)
     total = len(dataset)
     logging.info(f"total: {total}")
     train_len = int(0.8 * total)

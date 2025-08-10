@@ -25,6 +25,7 @@ Key Steps:
 import os
 import sys
 import argparse
+from typing import Optional
 import numpy as np
 import pandas as pd
 import torch
@@ -45,11 +46,17 @@ class MethylationCSVDataset(Dataset):
         - The rest columns as numeric features
     If the user sets quick_test=1, we further subsample rows & features to run quickly.
     """
-    def __init__(self, csv_path, quick_test=False, logger=print):
+    def __init__(self, csv_path: Optional[str] = None, df: Optional[pd.DataFrame] = None, quick_test: bool = False, logger=print):
         self.logger = logger
-        self.logger(f"[INFO] Loading CSV => {csv_path}")
-        df = pd.read_csv(csv_path)
-        self.logger(f"[INFO] Raw shape from CSV: {df.shape}")
+        if df is None:
+            if csv_path is None:
+                raise ValueError("Provide either csv_path or df to MethylationCSVDataset")
+            self.logger(f"[INFO] Loading CSV => {csv_path}")
+            df = pd.read_csv(csv_path)
+            self.logger(f"[INFO] Raw shape from CSV: {df.shape}")
+        else:
+            self.logger("[INFO] Using provided DataFrame for dataset")
+            self.logger(f"[INFO] Raw shape from DF: {df.shape}")
 
         if "Condition" not in df.columns:
             raise ValueError("No 'Condition' column found in the CSV. Please ensure last col is Condition.")
@@ -113,17 +120,23 @@ class DenoisingAutoencoder(nn.Module):
         recon = self.decoder(z)
         return recon
 
-def run_autoencoder_pretrain(tensor_X, batch_size=64, epochs=50, lr=1e-3, device=None, logger=print):
+def run_autoencoder_pretrain(tensor_train, tensor_val=None, batch_size=64, epochs=50, lr=1e-3, device=None, logger=print):
     """
-    Train AE on tensor_X (shape [N, F]). Return reconstructed tensor with same shape.
+    Train AE on tensor_train (shape [N, F]). If tensor_val provided, report validation loss.
+    Returns the trained model (weights also saved to autoencoder.pth).
     """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = DenoisingAutoencoder(input_dim=tensor_X.shape[1], latent_dim=128).to(device)
+    model = DenoisingAutoencoder(input_dim=tensor_train.shape[1], latent_dim=128).to(device)
     opt = optim.Adam(model.parameters(), lr=lr)
     mse = nn.MSELoss()
-    ds = torch.utils.data.TensorDataset(tensor_X)
+    ds = torch.utils.data.TensorDataset(tensor_train)
     dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    if tensor_val is not None:
+        ds_val = torch.utils.data.TensorDataset(tensor_val)
+        dl_val = DataLoader(ds_val, batch_size=batch_size, shuffle=False)
+    else:
+        dl_val = None
     model.train()
     for ep in range(epochs):
         ep_loss = 0.0
@@ -138,18 +151,34 @@ def run_autoencoder_pretrain(tensor_X, batch_size=64, epochs=50, lr=1e-3, device
             loss.backward()
             opt.step()
             ep_loss += loss.item()
-        logger(f"[AE] epoch {ep+1}/{epochs} loss={ep_loss/len(dl):.6f}")
-    # reconstruct full tensor
+        msg = f"[AE] epoch {ep+1}/{epochs} train_loss={ep_loss/len(dl):.6f}"
+        if dl_val is not None:
+            model.eval()
+            with torch.no_grad():
+                vloss = 0.0
+                for (xv,) in dl_val:
+                    xv = xv.to(device)
+                    recon_v = model(xv)
+                    vloss += mse(recon_v, xv).item()
+            vloss /= len(dl_val)
+            msg += f" val_loss={vloss:.6f}"
+            model.train()
+        logger(msg)
+    torch.save(model.state_dict(), "autoencoder.pth")
+    logger("[AE] Saved autoencoder.pth (encoder latent dim=128)")
+    return model
+
+def extract_autoencoder_latent(model, tensor_X, batch_size=64, device=None):
+    """Return 128D latent embeddings for all rows in tensor_X using model.encoder."""
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
+    outs = []
     with torch.no_grad():
-        out = []
         for i in range(0, tensor_X.size(0), batch_size):
             xb = tensor_X[i:i+batch_size].to(device)
-            out.append(model(xb).cpu())
-        recon_all = torch.cat(out, dim=0)
-    torch.save(model.state_dict(), "autoencoder.pth")
-    logger("[AE] Saved autoencoder.pth and produced reconstructed features")
-    return recon_all
+            outs.append(model.encoder(xb).cpu())
+    return torch.cat(outs, dim=0)
 
 ###############################################################################
 # Masked Pretraining Collate
@@ -406,6 +435,7 @@ class AdvancedTransformerClassifier(nn.Module):
                  max_passes=3,
                  act_threshold=0.99,
                  quick_test=False,
+                 use_act=False,
                  logger=print):
         super().__init__()
         self.logger = logger
@@ -417,6 +447,7 @@ class AdvancedTransformerClassifier(nn.Module):
         self.n_layers = n_layers
         self.n_classes = n_classes
         self.quick_test = quick_test
+        self.use_act = use_act
 
         # possibly scale down if quick_test
         if self.quick_test:
@@ -524,8 +555,27 @@ def train_transformer(args):
     logger("[INFO] Starting train_transformer with args:")
     logger(args)
 
-    # 1) Load dataset
-    dataset = MethylationCSVDataset(args.csv, quick_test=args.quick_test, logger=logger)
+    # 1) Load dataset: HF hub or CSV
+    df = None
+    if args.hf_dataset or args.hf_data_files:
+        try:
+            from src.utils.hf_data import load_methylation_dataframe
+        except Exception:
+            from pathlib import Path
+            # fallback relative import when running from repository root
+            import sys as _sys
+            _sys.path.append(str(Path(__file__).resolve().parents[3]))  # add repo root
+            from src.utils.hf_data import load_methylation_dataframe  # type: ignore
+        df = load_methylation_dataframe(
+            hf_dataset=args.hf_dataset,
+            hf_split=args.hf_split,
+            hf_config=args.hf_config,
+            data_files=args.hf_data_files,
+            csv_path=None,
+        )
+        dataset = MethylationCSVDataset(df=df, quick_test=args.quick_test, logger=logger)
+    else:
+        dataset = MethylationCSVDataset(csv_path=args.csv, quick_test=args.quick_test, logger=logger)
     n_samples, n_features = dataset.X.shape
     classes = dataset.classes
     logger(f"[DATA] #samples={n_samples}, #features={n_features}, #classes={len(classes)} => {classes}")
@@ -536,31 +586,27 @@ def train_transformer(args):
     train_data = torch.utils.data.Subset(dataset, train_idx)
     test_data  = torch.utils.data.Subset(dataset, test_idx)
 
-    # Another split from train_data => for pretraining vs not? Actually we do pretraining on the entire train_data. Then we do fine-tuning on the same data. Or we can do partial.
-    # We'll keep it simple: pretrain on entire train_data. Then fine-tune.
-
-    # Optional autoencoder-derived features (reconstructed features)
-    if args.enable_autoencoder:
-        logger("[AE] Pretraining autoencoder on training split to derive features...")
-        # Build a tensor with all data, but train AE using only training indices
-        X_all = dataset.X.clone()
-        recon_train = run_autoencoder_pretrain(X_all[train_idx], batch_size=max(32, args.batch_size),
-                                               epochs=50 if not args.quick_test else 5,
-                                               lr=1e-3, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-                                               logger=logger)
-        # Use AE on full matrix (inference only) to avoid distribution shift
-        with torch.no_grad():
-            device_ae = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            ae = DenoisingAutoencoder(input_dim=X_all.shape[1], latent_dim=128).to(device_ae)
-            ae.load_state_dict(torch.load("autoencoder.pth", map_location=device_ae))
-            ae.eval()
-            recon_full = []
-            for i in range(0, X_all.size(0), max(32, args.batch_size)):
-                xb = X_all[i:i+max(32, args.batch_size)].to(device_ae)
-                recon_full.append(ae(xb).cpu())
-            recon_full = torch.cat(recon_full, dim=0)
-        dataset.X = recon_full  # replace with AE-derived features (still 1280 dims)
-        logger("[AE] Replaced dataset.X with reconstructed (denoised) features")
+    # Another split from train_data => pretrain AE on 80% of train, validate on 20% (per paper)
+    logger("[AE] Pretraining autoencoder on training split (80/20 train/val) to derive 128D embeddings...")
+    X_all = dataset.X.clone()
+    from sklearn.model_selection import train_test_split as sk_tts
+    ae_tr_idx, ae_va_idx = sk_tts(train_idx, test_size=0.2, random_state=42, stratify=dataset.y[train_idx])
+    ae_tr_tensor = X_all[ae_tr_idx]
+    ae_va_tensor = X_all[ae_va_idx]
+    device_ae = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    ae_model = run_autoencoder_pretrain(ae_tr_tensor,
+                                        tensor_val=ae_va_tensor,
+                                        batch_size=max(32, args.batch_size),
+                                        epochs=50 if not args.quick_test else 5,
+                                        lr=1e-3,
+                                        device=device_ae,
+                                        logger=logger)
+    # Extract 128D latent embeddings for ALL samples (per paper)
+    latent_full = extract_autoencoder_latent(ae_model, X_all, batch_size=max(32, args.batch_size), device=device_ae)
+    dataset.X = latent_full
+    # Update feature count after AE compression
+    n_samples, n_features = dataset.X.shape
+    logger("[AE] Replaced dataset.X with 128D latent embeddings (per paper)")
 
     # 2) Build model
     # if quick_test => chunk_len=200 or something smaller
@@ -578,6 +624,7 @@ def train_transformer(args):
                                           n_classes=len(classes),
                                           max_passes=args.max_passes,
                                           act_threshold=args.act_threshold,
+                                          use_act=bool(args.use_act),
                                           quick_test=args.quick_test,
                                           logger=logger)
     logger("[INFO] Model created. Param count = "
@@ -637,6 +684,8 @@ def train_transformer(args):
     X_train = dataset.X[train_idx]
     y_train = dataset.y[train_idx]
     cv_f1s = []
+    cv_accs = []
+    cv_aucs = []
     for fold, (tr, va) in enumerate(skf.split(X_train, y_train), 1):
         tr_indices = train_idx[tr]
         va_indices = train_idx[va]
@@ -695,23 +744,35 @@ def train_transformer(args):
 
         # evaluate fold
         model_cv.eval()
-        all_preds, all_trues = [], []
+        all_preds, all_trues, all_probs = [], [], []
         with torch.no_grad():
             for Xb, Yb in va_loader:
                 Xb = Xb.to(device)
                 Yb = Yb.to(device)
                 logits = model_cv(Xb)
-                pred = torch.argmax(logits, dim=1)
+                prob = torch.softmax(logits, dim=1)
+                pred = torch.argmax(prob, dim=1)
                 all_preds.append(pred.cpu().numpy())
+                all_probs.append(prob.cpu().numpy())
                 all_trues.append(Yb.cpu().numpy())
         all_preds = np.concatenate(all_preds) if len(all_preds) else np.array([])
+        all_probs = np.concatenate(all_probs) if len(all_probs) else np.array([])
         all_trues = np.concatenate(all_trues) if len(all_trues) else np.array([])
         if all_preds.size and all_trues.size:
             f1v = f1_score(all_trues, all_preds, average='macro')
+            accv = (all_preds == all_trues).mean()
+            try:
+                from sklearn.preprocessing import label_binarize
+                Yb_oh = label_binarize(all_trues, classes=range(len(classes)))
+                aucv = roc_auc_score(Yb_oh, all_probs, average='macro', multi_class='ovr')
+            except:
+                aucv = float('nan')
             cv_f1s.append(f1v)
-            logger(f"[CV fold {fold}] Macro-F1={f1v:.4f}")
+            cv_accs.append(accv)
+            cv_aucs.append(aucv)
+            logger(f"[CV fold {fold}] Acc={accv:.4f} Macro-F1={f1v:.4f} Macro-AUC={aucv:.4f}")
     if cv_f1s:
-        logger(f"[CV] 10-fold Macro-F1 mean={np.mean(cv_f1s):.4f} ± {np.std(cv_f1s):.4f}")
+        logger(f"[CV] 10-fold mean Acc={np.mean(cv_accs):.4f} ± {np.std(cv_accs):.4f}, Macro-F1={np.mean(cv_f1s):.4f} ± {np.std(cv_f1s):.4f}, Macro-AUC={np.nanmean(cv_aucs):.4f} ± {np.nanstd(cv_aucs):.4f}")
     val_loader = None
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
                              collate_fn=classification_collate_fn)
@@ -741,7 +802,7 @@ def train_transformer(args):
             # ACT regularization: expected passes term
             act_penalty = getattr(model.act, 'last_expected_passes_tensor', None)
             if act_penalty is None:
-            loss = criterion(logits, Yb)
+                loss = criterion(logits, Yb)
             else:
                 loss = criterion(logits, Yb) + 1e-3 * act_penalty
             loss.backward()
@@ -843,6 +904,7 @@ def train_transformer(args):
                                                    n_classes=len(classes),
                                                    max_passes=args.max_passes,
                                                    act_threshold=args.act_threshold,
+                                                   use_act=bool(args.use_act),
                                                    quick_test=True,
                                                    logger=lambda *a, **k: None).to(device)
         opt_perm = optim.Adam(model_perm.parameters(), lr=args.finetune_lr, weight_decay=args.weight_decay)
@@ -877,10 +939,18 @@ def train_transformer(args):
 ###############################################################################
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", type=str, required=True, help="Path to the CSV with shape [samples x features], last col=Condition.")
+    parser.add_argument("--csv", type=str, required=False, help="Path to the CSV with shape [samples x features], last col=Condition.")
+    # Hugging Face dataset options
+    parser.add_argument("--hf-dataset", dest="hf_dataset", type=str, default=None,
+                        help="HF dataset repo id, e.g. 'user/methylation-betas'. If provided, overrides --csv.")
+    parser.add_argument("--hf-split", dest="hf_split", type=str, default="train", help="HF split to load (default: train)")
+    parser.add_argument("--hf-config", dest="hf_config", type=str, default=None, help="HF config name (if any)")
+    parser.add_argument("--hf-data-files", dest="hf_data_files", type=str, default=None,
+                        help="Optional CSV data_files path/URL for datasets 'csv' loader."
+                        )
     parser.add_argument("--quick_test", type=int, default=0, help="1=small ephemeral run for local debugging, 0=full run.")
     parser.add_argument("--enable_pretraining", action='store_true', help="Whether to do masked pretraining first.")
-    parser.add_argument("--enable_autoencoder", action='store_true', help="Use autoencoder-derived reconstructed features as transformer input.")
+    parser.add_argument("--enable_autoencoder", action='store_true', help="(Deprecated) Autoencoder is always used; transformer consumes 128D embeddings.")
     parser.add_argument("--pretrain_epochs", type=int, default=30, help="Number of epochs for masked pretraining.")
     parser.add_argument("--finetune_epochs", type=int, default=50, help="Number of epochs for classification.")
     parser.add_argument("--batch_size", type=int, default=16)
@@ -898,6 +968,8 @@ def main():
     parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate for transformer blocks and classifier.")
 
     args = parser.parse_args()
+    if not any([args.csv, args.hf_dataset, args.hf_data_files]):
+        parser.error("Provide --csv or --hf-dataset or --hf-data-files")
     train_transformer(args)
 
 if __name__ == "__main__":
