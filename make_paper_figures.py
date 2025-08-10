@@ -19,7 +19,7 @@ Modified to include:
   1) A hold-out set (20%) for final evaluation,
   2) Stratified K-Fold CV on the training portion,
   3) Logistic Regression baseline,
-  4) Sensitivity Analysis demonstration,
+  4) Sensitivity Analysis example,
   5) Extended clarity on diagnostic prints.
 """
 
@@ -41,11 +41,11 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.decomposition import PCA, TruncatedSVD
 
 # ---------------------------------------------------------
-# Adjust if your local directory structure differs
+# Resolve repository root dynamically to avoid hard-coded paths
 # ---------------------------------------------------------
-EPI_DIR = "/Volumes/T9/EpiMECoV/"  # Adjust as needed
-PROCESSED_DATA_DIR = os.path.join(EPI_DIR, "processed_data")
-RESULTS_DIR = os.path.join(EPI_DIR, "results")
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+RESULTS_DIR = os.path.join(REPO_ROOT, "results")
+PROCESSED_DATA_DIR = os.path.join(REPO_ROOT, "processed_data")
 BETA_FILE = os.path.join(PROCESSED_DATA_DIR, "filtered_biomarker_matrix.csv")
 
 # Optional DMP results (if they exist):
@@ -66,10 +66,7 @@ class DnamDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 class TransformerClassifier(nn.Module):
-    """
-    A simple Transformer-like model for classification.
-    (Kept minimal for demonstration.)
-    """
+    """Lightweight transformer baseline classifier used for figure generation."""
     def __init__(self, seq_len=128, num_heads=4, ff_dim=256, num_classes=3, dropout=0.1):
         super(TransformerClassifier, self).__init__()
         self.embedding = nn.Linear(seq_len, seq_len)
@@ -111,13 +108,10 @@ def plot_confusion_matrix(cm, classes, out_path, title="Confusion Matrix"):
     plt.close()
 
 # ---------------------------------------------------------
-# Sensitivity analysis example
+# RandomForest sensitivity analysis utility
 # ---------------------------------------------------------
 def random_forest_sensitivity_analysis(X_train, y_train, X_valid, y_valid):
-    """
-    Demonstrate how performance changes as we vary the number of estimators in RandomForest.
-    This is a simplistic example; adapt as needed.
-    """
+    """Evaluate macro-F1 across different n_estimators settings for RandomForest."""
     results = []
     n_estimators_list = [50, 100, 150, 200, 300, 500]
     for ne in n_estimators_list:
@@ -199,9 +193,9 @@ def main():
     )
     print(f"Train/Val shape => {X_trainval.shape}, Hold-Out => {X_holdout.shape}")
 
-    # 4) BASELINE COMPARISONS: (A) LOGISTIC REGRESSION, (B) RANDOM FOREST
-    #    Use STRATIFIED K-FOLD on the training portion only
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    # 4) BASELINE COMPARISONS: (A) LOGISTIC REGRESSION, (B) RANDOM FOREST, (C) XGBoost
+    #    Use STRATIFIED 10-FOLD on the training portion only (per paper)
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
 
     # ---- (A) Logistic Regression
     log_f1_scores = []
@@ -216,6 +210,38 @@ def main():
         print(f"[LogReg fold {fold_i}] Macro-F1={f1_v:.3f}")
     avg_log_f1 = np.mean(log_f1_scores)
     print(f"Logistic Regression CV Macro-F1 => {avg_log_f1:.3f}")
+    
+    # ---- (B) Random Forest
+    rf_f1_scores = []
+    for fold_i, (tr_idx, va_idx) in enumerate(skf.split(X_trainval, y_trainval), start=1):
+        X_tr, X_va = X_trainval[tr_idx], X_trainval[va_idx]
+        y_tr, y_va = y_trainval[tr_idx], y_trainval[va_idx]
+        rf_clf = RandomForestClassifier(n_estimators=200, random_state=42)
+        rf_clf.fit(X_tr, y_tr)
+        va_preds = rf_clf.predict(X_va)
+        f1_v = f1_score(y_va, va_preds, average='macro')
+        rf_f1_scores.append(f1_v)
+        print(f"[RF fold {fold_i}] Macro-F1={f1_v:.3f}")
+    avg_rf_f1 = np.mean(rf_f1_scores)
+    print(f"Random Forest CV Macro-F1 => {avg_rf_f1:.3f}")
+
+    # ---- (C) XGBoost (if available)
+    try:
+        from xgboost import XGBClassifier
+        xgb_f1_scores = []
+        for fold_i, (tr_idx, va_idx) in enumerate(skf.split(X_trainval, y_trainval), start=1):
+            X_tr, X_va = X_trainval[tr_idx], X_trainval[va_idx]
+            y_tr, y_va = y_trainval[tr_idx], y_trainval[va_idx]
+            xgb = XGBClassifier(use_label_encoder=False, eval_metric='mlogloss', random_state=42)
+            xgb.fit(X_tr, y_tr)
+            va_preds = xgb.predict(X_va)
+            f1_v = f1_score(y_va, va_preds, average='macro')
+            xgb_f1_scores.append(f1_v)
+            print(f"[XGB fold {fold_i}] Macro-F1={f1_v:.3f}")
+        avg_xgb_f1 = np.mean(xgb_f1_scores)
+        print(f"XGBoost CV Macro-F1 => {avg_xgb_f1:.3f}")
+    except Exception as e:
+        print("[WARN] XGBoost not available:", e)
 
     # Train final LogReg on entire trainval, evaluate on hold-out
     final_log = LogisticRegression(max_iter=200, solver='lbfgs', multi_class='auto', random_state=42)
@@ -234,7 +260,7 @@ def main():
                           os.path.join(RESULTS_DIR, "logreg_holdout_confusion.png"),
                           title="Logistic Regression (Hold-Out)")
 
-    # ---- (B) Random Forest
+    # ---- (B) Random Forest (100 trees, tuned depth optional)
     rf_f1_scores = []
     for fold_i, (tr_idx, va_idx) in enumerate(skf.split(X_trainval, y_trainval), start=1):
         X_tr, X_va = X_trainval[tr_idx], X_trainval[va_idx]
@@ -267,15 +293,14 @@ def main():
 
     # (B.1) Optional Sensitivity Analysis for RandomForest
     # We'll do this using the train/val approach again
-    # (here we just do a single train/val split from the trainval set, for demonstration)
+    # Here we do a single train/val split from the trainval set
     X_subtrain, X_subval, y_subtrain, y_subval = train_test_split(
         X_trainval, y_trainval, test_size=0.2, random_state=99, stratify=y_trainval
     )
-    print("\n=== RandomForest Sensitivity Analysis Demo ===")
+    print("\n=== RandomForest Sensitivity Analysis ===")
     random_forest_sensitivity_analysis(X_subtrain, y_subtrain, X_subval, y_subval)
 
-    # 5) SIMPLE TRANSFORMER EXAMPLE (similar to original code) with Monte Carlo Dropout
-    #    We'll do the final train on trainval, evaluate on hold-out.
+    # 5) Transformer baseline with Monte Carlo Dropout; train on trainval, eval on hold-out.
     from sklearn.decomposition import TruncatedSVD
     reduced_dim = 128
     # SVD to reduce dimensionality (if needed)
@@ -316,7 +341,7 @@ def main():
         avg_loss = total_loss / len(train_loader)
         print(f"[Transformer] Epoch {epoch+1}/{epochs}, Loss={avg_loss:.4f}")
 
-    # MC-Dropout Inference (example)
+    # MC-Dropout Inference
     model_trans.train()  # keep dropout in training mode
     mc_samples = 20
     hold_preds_list = []
