@@ -111,30 +111,37 @@ fit2 <- eBayes(fit2)
 cat("[INFO] Extracting topTable for each contrast.\n\n")
 
 # (H) Filter DMP results before saving
-# Set thresholds: adjusted P-value < 0.05 and absolute logFC > 0.2
-pval_thresh <- 0.05
-logfc_thresh <- 0.2
+# Per paper: select CpGs with adjusted P-value < 0.01 (no additional logFC filter)
+pval_thresh <- 0.01
 
 top_ME <- topTable(fit2, coef = "ME_vs_Control", number = Inf, 
                    adjust.method = "BH", sort.by = "P")
-sig_ME <- top_ME[top_ME$adj.P.Val < pval_thresh & abs(top_ME$logFC) > logfc_thresh, ]
+sig_ME <- top_ME[top_ME$adj.P.Val < pval_thresh, ]
 cat(" => ME vs Control: Found", nrow(sig_ME), "significant probes (of", nrow(top_ME), ").\n")
 out_ME <- file.path(results_dir, "DMP_ME_vs_Control.csv")
 write.csv(sig_ME, out_ME, row.names = TRUE, quote = FALSE)
 
 top_LC <- topTable(fit2, coef = "LC_vs_Control", number = Inf,
                    adjust.method = "BH", sort.by = "P")
-sig_LC <- top_LC[top_LC$adj.P.Val < pval_thresh & abs(top_LC$logFC) > logfc_thresh, ]
+sig_LC <- top_LC[top_LC$adj.P.Val < pval_thresh, ]
 cat(" => LC vs Control: Found", nrow(sig_LC), "significant probes (of", nrow(top_LC), ").\n")
 out_LC <- file.path(results_dir, "DMP_LC_vs_Control.csv")
 write.csv(sig_LC, out_LC, row.names = TRUE, quote = FALSE)
 
 top_ME_LC <- topTable(fit2, coef = "ME_vs_LC", number = Inf,
                       adjust.method = "BH", sort.by = "P")
-sig_ME_LC <- top_ME_LC[top_ME_LC$adj.P.Val < pval_thresh & abs(top_ME_LC$logFC) > logfc_thresh, ]
+sig_ME_LC <- top_ME_LC[top_ME_LC$adj.P.Val < pval_thresh, ]
 cat(" => ME vs LC: Found", nrow(sig_ME_LC), "significant probes (of", nrow(top_ME_LC), ").\n")
 out_ME_LC <- file.path(results_dir, "DMP_ME_vs_LC.csv")
 write.csv(sig_ME_LC, out_ME_LC, row.names = TRUE, quote = FALSE)
 
 cat("\n=== Differential Methylation Analysis Complete. ===\n")
 cat("Results saved in the 'results' folder.\n")
+
+# Optionally, write a combined list of CpGs with adj.P.Val < 0.01 across any contrast (for downstream top-1280 selection)
+try({
+  sig_all <- unique(c(rownames(sig_ME), rownames(sig_LC), rownames(sig_ME_LC)))
+  out_all <- file.path(results_dir, "DMP_all_adjP_lt_0.01.txt")
+  write.table(sig_all, out_all, row.names = FALSE, col.names = FALSE, quote = FALSE)
+  cat("[SAVED] =>", out_all, "\n")
+}, silent = TRUE)

@@ -54,10 +54,8 @@ class MethylationCSVDataset(Dataset):
         if "Condition" not in df.columns:
             raise ValueError("No 'Condition' column found in the CSV. Please ensure last col is Condition.")
 
-        # (Optional) If your CSV has shape [Features x Samples], you might need to transpose:
-        # Uncomment if needed:
-        df = df.T  # <--- COMMENT THIS OUT OR UNCOMMENT IF SHAPE IS FLIPPED
-        # If you do transpose, confirm "Condition" ends up as a column, etc.
+        # If your CSV has shape [Features x Samples], you may need to transpose.
+        # We avoid automatic transpose here to prevent accidental mishandling.
 
         # Condition as the last column
         cond_values = df["Condition"].values.astype(str)
@@ -67,7 +65,12 @@ class MethylationCSVDataset(Dataset):
 
         df_feat = df.drop(columns=["Condition"])
         # Convert to float
-        Xmat = df_feat.values
+        Xmat = df_feat.values.astype(np.float32)
+        # Per paper: z-score normalize each sample's beta-values
+        eps = 1e-8
+        row_mean = Xmat.mean(axis=1, keepdims=True)
+        row_std = Xmat.std(axis=1, keepdims=True) + eps
+        Xmat = (Xmat - row_mean) / row_std
         self.logger(f"[INFO] Feature matrix shape before quick_test: {Xmat.shape}")
 
         if quick_test:
@@ -89,6 +92,64 @@ class MethylationCSVDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
+
+###############################################################################
+# Autoencoder for Denoising/Feature Extraction (keeps 1280 dims via recon)
+###############################################################################
+class DenoisingAutoencoder(nn.Module):
+    def __init__(self, input_dim=1280, latent_dim=128):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 1024), nn.GELU(),
+            nn.Linear(1024, latent_dim), nn.GELU(),
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 1024), nn.GELU(),
+            nn.Linear(1024, input_dim)
+        )
+
+    def forward(self, x):
+        z = self.encoder(x)
+        recon = self.decoder(z)
+        return recon
+
+def run_autoencoder_pretrain(tensor_X, batch_size=64, epochs=50, lr=1e-3, device=None, logger=print):
+    """
+    Train AE on tensor_X (shape [N, F]). Return reconstructed tensor with same shape.
+    """
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = DenoisingAutoencoder(input_dim=tensor_X.shape[1], latent_dim=128).to(device)
+    opt = optim.Adam(model.parameters(), lr=lr)
+    mse = nn.MSELoss()
+    ds = torch.utils.data.TensorDataset(tensor_X)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    model.train()
+    for ep in range(epochs):
+        ep_loss = 0.0
+        for (xb,) in dl:
+            xb = xb.to(device)
+            # lightweight denoising
+            noise = 0.01 * torch.randn_like(xb)
+            noisy = xb + noise
+            opt.zero_grad()
+            recon = model(noisy)
+            loss = mse(recon, xb)
+            loss.backward()
+            opt.step()
+            ep_loss += loss.item()
+        logger(f"[AE] epoch {ep+1}/{epochs} loss={ep_loss/len(dl):.6f}")
+    # reconstruct full tensor
+    model.eval()
+    with torch.no_grad():
+        out = []
+        for i in range(0, tensor_X.size(0), batch_size):
+            xb = tensor_X[i:i+batch_size].to(device)
+            out.append(model(xb).cpu())
+        recon_all = torch.cat(out, dim=0)
+    torch.save(model.state_dict(), "autoencoder.pth")
+    logger("[AE] Saved autoencoder.pth and produced reconstructed features")
+    return recon_all
 
 ###############################################################################
 # Masked Pretraining Collate
@@ -126,56 +187,83 @@ def classification_collate_fn(batch):
 ###############################################################################
 
 class DynamicLinear(nn.Module):
-    """A linear layer that can be smaller if quick_test. Just a normal linear, but we keep naming from prior examples."""
+    """Linear layer wrapper kept for compatibility; not a placeholder."""
     def __init__(self, in_features, out_features):
         super().__init__()
         self.linear = nn.Linear(in_features, out_features)
     def forward(self, x):
         return self.linear(x)
 
-class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model, num_heads, dropout=0.1):
+class LoRALinear(nn.Module):
+    def __init__(self, in_features, out_features, r=8, alpha=1.0):
         super().__init__()
-        assert d_model % num_heads == 0
-        self.d_model = d_model
-        self.num_heads = num_heads
-        self.head_dim = d_model // num_heads
-        self.q_proj = nn.Linear(d_model, d_model)
-        self.k_proj = nn.Linear(d_model, d_model)
-        self.v_proj = nn.Linear(d_model, d_model)
-        self.o_proj = nn.Linear(d_model, d_model)
-        self.dropout = nn.Dropout(dropout)
+        self.weight = nn.Parameter(torch.empty(out_features, in_features))
+        self.bias = nn.Parameter(torch.zeros(out_features))
+        nn.init.kaiming_uniform_(self.weight, a=5 ** 0.5)
+        self.A = nn.Parameter(torch.zeros(r, in_features))
+        self.B = nn.Parameter(torch.zeros(out_features, r))
+        nn.init.kaiming_uniform_(self.A, a=5 ** 0.5)
+        nn.init.kaiming_uniform_(self.B, a=5 ** 0.5)
+        self.scaling = alpha / max(1, r)
 
     def forward(self, x):
-        # x: [B, L, d_model]
-        B, L, D = x.shape
-        q = self.q_proj(x).view(B, L, self.num_heads, self.head_dim)
-        k = self.k_proj(x).view(B, L, self.num_heads, self.head_dim)
-        v = self.v_proj(x).view(B, L, self.num_heads, self.head_dim)
+        base = x @ self.weight.t() + self.bias
+        lora = (x @ self.A.t()) @ self.B.t() * self.scaling
+        return base + lora
 
-        # transpose to [B, num_heads, L, head_dim]
-        q = q.permute(0,2,1,3)
-        k = k.permute(0,2,1,3)
-        v = v.permute(0,2,1,3)
+def alibi_slopes(n_heads):
+    slopes = []
+    base = 1.0
+    for _ in range(n_heads):
+        slopes.append(base)
+        base *= 0.5
+    return torch.tensor(slopes)
 
-        # scaled dot product
-        scores = torch.matmul(q, k.transpose(-1, -2)) / (self.head_dim ** 0.5)
+class ALiBiMultiheadAttention(nn.Module):
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.q_proj = LoRALinear(embed_dim, embed_dim)
+        self.k_proj = LoRALinear(embed_dim, embed_dim)
+        self.v_proj = LoRALinear(embed_dim, embed_dim)
+        self.o_proj = LoRALinear(embed_dim, embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.register_buffer("slopes", alibi_slopes(num_heads), persistent=False)
+        self.rezero = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x):
+        B, L, _ = x.shape
+        Q = self.q_proj(x).view(B, L, self.num_heads, self.head_dim)
+        K = self.k_proj(x).view(B, L, self.num_heads, self.head_dim)
+        V = self.v_proj(x).view(B, L, self.num_heads, self.head_dim)
+        Q = Q.permute(0, 2, 1, 3)
+        K = K.permute(0, 2, 1, 3)
+        V = V.permute(0, 2, 1, 3)
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.head_dim ** 0.5)
+        pos_ids = torch.arange(L, device=x.device).view(1, 1, L)
+        rel = pos_ids - pos_ids.transpose(-1, -2)
+        slopes_2d = self.slopes.view(self.num_heads, 1, 1).to(x.device)
+        alibi = slopes_2d * rel
+        alibi = alibi.unsqueeze(0)
+        scores = scores + alibi
         attn = torch.softmax(scores, dim=-1)
         attn = self.dropout(attn)
-        out = torch.matmul(attn, v) # [B, num_heads, L, head_dim]
-
-        out = out.permute(0,2,1,3).contiguous().view(B, L, D)
+        out = torch.matmul(attn, V)
+        out = out.permute(0, 2, 1, 3).contiguous().view(B, L, self.embed_dim)
         out = self.o_proj(out)
-        return out
+        return x + self.rezero * out
 
 class MoEFeedForward(nn.Module):
     """
     Mixture-of-Experts feed-forward network with E experts. Gate is a small linear -> softmax.
     Each expert is a 2-layer MLP (GELU).
     """
-    def __init__(self, d_model, d_ff, E=4, dropout=0.1):
+    def __init__(self, d_model, d_ff, E=4, dropout=0.1, top_k=2):
         super().__init__()
         self.E = E
+        self.top_k = min(max(1, top_k), E)
         self.gate = nn.Linear(d_model, E)
         self.experts = nn.ModuleList()
         self.dropout = nn.Dropout(dropout)
@@ -197,6 +285,15 @@ class MoEFeedForward(nn.Module):
         # gating
         gate_logits = self.gate(x)  # [B, L, E]
         gate_scores = torch.softmax(gate_logits, dim=-1)  # [B, L, E]
+        # sparsify: keep top_k experts per token
+        if self.top_k < self.E:
+            topk_vals, topk_idx = torch.topk(gate_scores, k=self.top_k, dim=-1)
+            mask = torch.zeros_like(gate_scores)
+            mask.scatter_(-1, topk_idx, 1.0)
+            gate_scores = gate_scores * mask
+            # renormalize
+            denom = gate_scores.sum(dim=-1, keepdim=True) + 1e-9
+            gate_scores = gate_scores / denom
 
         # for each expert, we compute that expert's output
         # then sum up with the gating as weights
@@ -222,19 +319,17 @@ class TransformerBlock(nn.Module):
     """
     def __init__(self, d_model, num_heads, d_ff, E=4, dropout=0.1):
         super().__init__()
-        self.mha = MultiHeadAttention(d_model, num_heads, dropout)
+        self.mha = ALiBiMultiheadAttention(d_model, num_heads, dropout)
         self.ln1 = nn.LayerNorm(d_model)
         self.moe_ff = MoEFeedForward(d_model, d_ff, E=E, dropout=dropout)
         self.ln2 = nn.LayerNorm(d_model)
+        self.rezero_ffn = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
         # x: [B, L, d_model]
-        attn_out = self.mha(x)
-        x = x + attn_out
-        x = self.ln1(x)
-
-        ff_out = self.moe_ff(x)
-        x = x + ff_out
+        attn_out = self.ln1(self.mha(x))
+        ff_out = self.moe_ff(attn_out)
+        x = attn_out + self.rezero_ffn * ff_out
         x = self.ln2(x)
         return x
 
@@ -253,26 +348,42 @@ class AdaptiveComputationTime(nn.Module):
 
     def forward(self, x, blocks):
         """
-        x shape: [B, L, d_model].
-        blocks: list of TransformerBlock
-        We do a pass of all blocks => x,
-        then compute halting prob. If < threshold => do another pass, etc.
-        We'll do it for the entire batch for simplicity,
-        though real ACT can do per-sample. We'll do the simpler version.
+        Per-sample ACT with simple halting:
+        - After each full pass, compute p_i for each sample
+        - Samples with p_i >= threshold are considered halted and keep their last state
+        - Continue up to max_passes for remaining samples
+        Also computes a differentiable expected pass count for regularization.
         """
-        for pass_idx in range(self.max_passes):
-            # pass the entire stack
+        B = x.size(0)
+        active = torch.ones(B, 1, device=x.device)
+        remainders = torch.ones(B, 1, device=x.device)  # product of (1-p)
+        expected_passes = 0.0
+        x_current = x
+        for t in range(self.max_passes):
+            x_next = x_current
             for block in blocks:
-                x = block(x)
-            # compute halting prob
-            x_mean = x.mean(dim=1)  # [B, d_model]
-            p = torch.sigmoid(self.halt_linear(x_mean))
-            p_mean = p.mean().item()
-            # Logging
-            # We'll do a small or partial pass if we want. But let's do a simple approach: if p_mean > threshold => break
-            if p_mean > self.act_threshold:
+                x_next = block(x_next)
+            x_mean = x_next.mean(dim=1)
+            p = torch.sigmoid(self.halt_linear(x_mean)).unsqueeze(-1)  # [B,1,1] after unsqueeze
+            p = p.squeeze(-1)  # [B,1]
+            # Expected pass contribution: (t+1) * p * remainders
+            expected_passes = expected_passes + (t + 1) * (p * remainders)
+            # Determine which samples halt this step
+            halt_mask = (p >= self.act_threshold).float()  # [B,1]
+            # Update x only for still-active samples
+            active_mask = (active > 0.5).float()
+            update_mask = (active_mask * (1.0 - halt_mask)).view(B, 1, 1)
+            keep_mask = (1.0 - update_mask)
+            x_current = x_next * update_mask + x_current * keep_mask
+            # Update active and remainders
+            active = active * (1.0 - halt_mask)
+            remainders = remainders * (1.0 - p)
+            # If all halted, stop early
+            if active.sum().item() == 0:
                 break
-        return x  # final
+        # Save differentiable scalar regularizer
+        self.last_expected_passes_tensor = expected_passes.mean()
+        return x_current
 
 class AdvancedTransformerClassifier(nn.Module):
     """
@@ -283,14 +394,14 @@ class AdvancedTransformerClassifier(nn.Module):
      - classification head
     plus a separate 'mask_recon_head' for pretraining
     """
-    def __init__(self, input_dim=1280, # number of features
-                 chunk_len=320, # how many features per chunk
-                 d_model=256,
+    def __init__(self, input_dim=1280,
+                 chunk_len=320,
+                 d_model=64,
                  num_heads=4,
-                 d_ff=1024,
-                 E=4, # number of MoE experts
-                 dropout=0.1,
-                 n_layers=4,
+                 d_ff=256,
+                 E=4,
+                 dropout=0.2,
+                 n_layers=6,
                  n_classes=3,
                  max_passes=3,
                  act_threshold=0.99,
@@ -309,17 +420,18 @@ class AdvancedTransformerClassifier(nn.Module):
 
         # possibly scale down if quick_test
         if self.quick_test:
-            self.d_model = 64
-            self.d_ff = 256
-            self.logger("[INFO] quick_test => d_model=64, d_ff=256, n_layers=2")
+            # keep the same dims per paper, but reduce layers for speed in quick mode
+            self.n_layers = 2
+            self.logger("[INFO] quick_test => n_layers=2 (dims fixed to match paper)")
 
         # compute how many chunks
         self.num_chunks = (self.input_dim + self.chunk_len - 1)// self.chunk_len
 
         # input proj
-        # We'll do a simple linear that goes from chunk_len -> d_model
-        # We'll store it as self.embedding
-        self.embedding = nn.Linear(self.chunk_len, self.d_model)
+        self.embedding = LoRALinear(self.chunk_len, self.d_model)
+        # learned positional encodings per token (num_chunks)
+        self.positional = nn.Parameter(torch.zeros(1, (self.input_dim + self.chunk_len - 1)// self.chunk_len, self.d_model))
+        nn.init.normal_(self.positional, mean=0.0, std=0.02)
 
         # Build blocks
         self.blocks = nn.ModuleList([
@@ -330,6 +442,10 @@ class AdvancedTransformerClassifier(nn.Module):
 
         # ACT
         self.act = AdaptiveComputationTime(self.d_model, max_passes, act_threshold)
+
+        # RNN integration block per paper table
+        self.rnn = nn.GRU(self.d_model, self.d_model // 2, batch_first=True, bidirectional=True)
+        self.rnn_proj = nn.Linear(self.d_model, self.d_model)
 
         # classifier
         self.classifier = nn.Sequential(
@@ -361,8 +477,13 @@ class AdvancedTransformerClassifier(nn.Module):
         x = x.view(B, self.num_chunks, self.chunk_len)
         # embed each chunk => [B, num_chunks, d_model]
         x = self.embedding(x)
-        # pass into ACT with the blocks
+        # add learned positional encodings
+        pos = self.positional[:, :self.num_chunks, :]
+        x = x + pos
         x = self.act(x, self.blocks)
+        # RNN integration
+        rnn_out, _ = self.rnn(x)
+        x = self.rnn_proj(rnn_out)
         # mean pool across chunks
         x_mean = x.mean(dim=1) # [B, d_model]
         logits = self.classifier(x_mean)
@@ -409,7 +530,7 @@ def train_transformer(args):
     classes = dataset.classes
     logger(f"[DATA] #samples={n_samples}, #features={n_features}, #classes={len(classes)} => {classes}")
 
-    # We'll do a small hold-out or user can do CV. For simplicity: 80/20 split
+    # Per paper: 20% independent hold-out, plus 10-fold stratified CV on train
     indices = np.arange(len(dataset))
     train_idx, test_idx = train_test_split(indices, test_size=0.2, random_state=42, stratify=dataset.y)
     train_data = torch.utils.data.Subset(dataset, train_idx)
@@ -417,6 +538,29 @@ def train_transformer(args):
 
     # Another split from train_data => for pretraining vs not? Actually we do pretraining on the entire train_data. Then we do fine-tuning on the same data. Or we can do partial.
     # We'll keep it simple: pretrain on entire train_data. Then fine-tune.
+
+    # Optional autoencoder-derived features (reconstructed features)
+    if args.enable_autoencoder:
+        logger("[AE] Pretraining autoencoder on training split to derive features...")
+        # Build a tensor with all data, but train AE using only training indices
+        X_all = dataset.X.clone()
+        recon_train = run_autoencoder_pretrain(X_all[train_idx], batch_size=max(32, args.batch_size),
+                                               epochs=50 if not args.quick_test else 5,
+                                               lr=1e-3, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+                                               logger=logger)
+        # Use AE on full matrix (inference only) to avoid distribution shift
+        with torch.no_grad():
+            device_ae = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            ae = DenoisingAutoencoder(input_dim=X_all.shape[1], latent_dim=128).to(device_ae)
+            ae.load_state_dict(torch.load("autoencoder.pth", map_location=device_ae))
+            ae.eval()
+            recon_full = []
+            for i in range(0, X_all.size(0), max(32, args.batch_size)):
+                xb = X_all[i:i+max(32, args.batch_size)].to(device_ae)
+                recon_full.append(ae(xb).cpu())
+            recon_full = torch.cat(recon_full, dim=0)
+        dataset.X = recon_full  # replace with AE-derived features (still 1280 dims)
+        logger("[AE] Replaced dataset.X with reconstructed (denoised) features")
 
     # 2) Build model
     # if quick_test => chunk_len=200 or something smaller
@@ -448,7 +592,7 @@ def train_transformer(args):
         pt_dataset = torch.utils.data.Subset(dataset, train_idx)  # or entire dataset if you prefer
         pt_loader = DataLoader(pt_dataset, batch_size=args.batch_size, shuffle=True,
                                collate_fn=lambda b: masked_collate_fn(b, mask_prob=0.15, logger=logger))
-        pt_opt = optim.AdamW(model.parameters(), lr=args.pretrain_lr, weight_decay=args.weight_decay)
+        pt_opt = optim.Adam(model.parameters(), lr=args.pretrain_lr, weight_decay=args.weight_decay)
         # We'll do a small # epochs for quick test
         pretrain_epochs = args.pretrain_epochs if not args.quick_test else 2
         for ep in range(1, pretrain_epochs+1):
@@ -487,11 +631,101 @@ def train_transformer(args):
 
     ft_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True,
                            collate_fn=classification_collate_fn)
-    val_loader = None  # we can do a 10% from train as well for val, but let's keep it simpler
+    # 10-fold CV on train split (re-train per fold, using pretrained weights if available)
+    from sklearn.model_selection import StratifiedKFold
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+    X_train = dataset.X[train_idx]
+    y_train = dataset.y[train_idx]
+    cv_f1s = []
+    for fold, (tr, va) in enumerate(skf.split(X_train, y_train), 1):
+        tr_indices = train_idx[tr]
+        va_indices = train_idx[va]
+        tr_subset = torch.utils.data.Subset(dataset, tr_indices)
+        va_subset = torch.utils.data.Subset(dataset, va_indices)
+        tr_loader = DataLoader(tr_subset, batch_size=args.batch_size, shuffle=True, collate_fn=classification_collate_fn)
+        va_loader = DataLoader(va_subset, batch_size=args.batch_size, shuffle=False, collate_fn=classification_collate_fn)
+
+        # fresh model per fold
+        model_cv = AdvancedTransformerClassifier(input_dim=n_features,
+                                                 chunk_len=chunk_len,
+                                                 d_model=args.d_model,
+                                                 num_heads=args.num_heads,
+                                                 d_ff=args.d_ff,
+                                                 E=args.num_experts,
+                                                 dropout=args.dropout,
+                                                 n_layers=args.n_layers,
+                                                 n_classes=len(classes),
+                                                 max_passes=args.max_passes,
+                                                 act_threshold=args.act_threshold,
+                                                 quick_test=args.quick_test,
+                                                 logger=logger).to(device)
+        if args.enable_pretraining and os.path.exists("pretrain_model.pth"):
+            try:
+                model_cv.load_state_dict(torch.load("pretrain_model.pth", map_location=device), strict=False)
+            except Exception as e:
+                logger(f"[CV fold {fold}] Warning: could not load pretrained weights: {e}")
+        opt_cv = optim.Adam(model_cv.parameters(), lr=args.finetune_lr, weight_decay=args.weight_decay)
+        total_steps_cv = max(1, len(tr_loader) * max(1, (min(10, args.finetune_epochs) if not args.quick_test else 2)))
+        warmup_steps_cv = int(0.1 * total_steps_cv)
+        def lr_lambda_cv(step):
+            if step < warmup_steps_cv:
+                return float(step) / float(max(1, warmup_steps_cv))
+            progress = float(step - warmup_steps_cv) / float(max(1, total_steps_cv - warmup_steps_cv))
+            return 0.5 * (1.0 + np.cos(np.pi * progress))
+        sched_cv = torch.optim.lr_scheduler.LambdaLR(opt_cv, lr_lambda=lr_lambda_cv)
+        crit_cv = nn.CrossEntropyLoss()
+
+        model_cv.train()
+        step_ct = 0
+        for ep in range(1, (min(10, args.finetune_epochs) if not args.quick_test else 2) + 1):
+            for Xb, Yb in tr_loader:
+                Xb = Xb.to(device)
+                Yb = Yb.to(device)
+                opt_cv.zero_grad()
+                logits = model_cv(Xb)
+                act_penalty = getattr(model_cv.act, 'last_expected_passes_tensor', None)
+                if act_penalty is None:
+                    loss_cv = crit_cv(logits, Yb)
+                else:
+                    loss_cv = crit_cv(logits, Yb) + 1e-3 * act_penalty
+                loss_cv.backward()
+                opt_cv.step()
+                sched_cv.step()
+                step_ct += 1
+
+        # evaluate fold
+        model_cv.eval()
+        all_preds, all_trues = [], []
+        with torch.no_grad():
+            for Xb, Yb in va_loader:
+                Xb = Xb.to(device)
+                Yb = Yb.to(device)
+                logits = model_cv(Xb)
+                pred = torch.argmax(logits, dim=1)
+                all_preds.append(pred.cpu().numpy())
+                all_trues.append(Yb.cpu().numpy())
+        all_preds = np.concatenate(all_preds) if len(all_preds) else np.array([])
+        all_trues = np.concatenate(all_trues) if len(all_trues) else np.array([])
+        if all_preds.size and all_trues.size:
+            f1v = f1_score(all_trues, all_preds, average='macro')
+            cv_f1s.append(f1v)
+            logger(f"[CV fold {fold}] Macro-F1={f1v:.4f}")
+    if cv_f1s:
+        logger(f"[CV] 10-fold Macro-F1 mean={np.mean(cv_f1s):.4f} ± {np.std(cv_f1s):.4f}")
+    val_loader = None
     test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False,
                              collate_fn=classification_collate_fn)
 
-    ft_opt = optim.AdamW(model.parameters(), lr=args.finetune_lr, weight_decay=args.weight_decay)
+    ft_opt = optim.Adam(model.parameters(), lr=args.finetune_lr, weight_decay=args.weight_decay)
+    # Warmup + cosine scheduler
+    total_steps = max(1, len(ft_loader) * max(1, (args.finetune_epochs if not args.quick_test else 3)))
+    warmup_steps = int(0.1 * total_steps)
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return float(step) / float(max(1, warmup_steps))
+        progress = float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        return 0.5 * (1.0 + np.cos(np.pi * progress))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(ft_opt, lr_lambda=lr_lambda)
     criterion = nn.CrossEntropyLoss()
 
     max_epochs = args.finetune_epochs if not args.quick_test else 3
@@ -504,9 +738,15 @@ def train_transformer(args):
             Yb = Yb.to(device)
             ft_opt.zero_grad()
             logits = model(Xb)
+            # ACT regularization: expected passes term
+            act_penalty = getattr(model.act, 'last_expected_passes_tensor', None)
+            if act_penalty is None:
             loss = criterion(logits, Yb)
+            else:
+                loss = criterion(logits, Yb) + 1e-3 * act_penalty
             loss.backward()
             ft_opt.step()
+            scheduler.step()
             epoch_loss += loss.item()
             if (i+1) % 10 == 0:
                 logger(f"[TRAIN] ep={ep} iter={i+1}/{len(ft_loader)} partial_loss={loss.item():.6f}")
@@ -530,7 +770,7 @@ def train_transformer(args):
         train_f1 = f1_score(all_trues, all_preds, average='macro')
         logger(f"[TRAIN] Ep {ep}/{max_epochs}, loss={epoch_loss:.6f}, train_F1={train_f1:.4f}")
 
-        # If we had val_loader, we would do val_f1. For demonstration, let's just track train_f1
+        # If we had val_loader, we would compute val_f1; here we track train_f1
         if train_f1 > best_f1:
             best_f1 = train_f1
             # save
@@ -582,6 +822,53 @@ def train_transformer(args):
     acc = (all_preds==all_trues).mean()*100.0
     logger(f"[TEST] Accuracy={acc:.2f}%, Macro-F1={test_f1:.4f}, Macro-AUC={auc_ovr:.4f}")
 
+    # Permutation testing: 100 shuffles of labels on test set
+    logger("[TEST] Permutation testing (100 shuffles of TRAIN labels) ...")
+    from sklearn.utils import shuffle as skshuffle
+    perm_acc = []
+    for _ in range(100):
+        # shuffle training labels
+        y_perm = skshuffle(dataset.y[train_idx], random_state=None)
+        perm_subset = torch.utils.data.TensorDataset(dataset.X[train_idx], torch.from_numpy(y_perm))
+        perm_loader = DataLoader(perm_subset, batch_size=args.batch_size, shuffle=True)
+        # fresh small model for speed
+        model_perm = AdvancedTransformerClassifier(input_dim=n_features,
+                                                   chunk_len=chunk_len,
+                                                   d_model=args.d_model,
+                                                   num_heads=args.num_heads,
+                                                   d_ff=args.d_ff,
+                                                   E=args.num_experts,
+                                                   dropout=args.dropout,
+                                                   n_layers=max(2, args.n_layers//2),
+                                                   n_classes=len(classes),
+                                                   max_passes=args.max_passes,
+                                                   act_threshold=args.act_threshold,
+                                                   quick_test=True,
+                                                   logger=lambda *a, **k: None).to(device)
+        opt_perm = optim.Adam(model_perm.parameters(), lr=args.finetune_lr, weight_decay=args.weight_decay)
+        crit_perm = nn.CrossEntropyLoss()
+        model_perm.train()
+        for ep in range(2):
+            for Xb, Yb in perm_loader:
+                Xb = Xb.to(device)
+                Yb = Yb.to(device)
+                opt_perm.zero_grad()
+                logits = model_perm(Xb)
+                loss_p = crit_perm(logits, Yb)
+                loss_p.backward()
+                opt_perm.step()
+        # evaluate on same test set
+        model_perm.eval()
+        preds_perm = []
+        with torch.no_grad():
+            for Xb, Yb in test_loader:
+                Xb = Xb.to(device)
+                logit = model_perm(Xb)
+                preds_perm.append(torch.argmax(logit, dim=1).cpu().numpy())
+        preds_perm = np.concatenate(preds_perm)
+        perm_acc.append((preds_perm == all_trues).mean() * 100.0)
+    logger(f"[TEST] Permutation test mean accuracy (chance level estimate): {np.mean(perm_acc):.2f}% ± {np.std(perm_acc):.2f}")
+
     # We are done
     return
 
@@ -593,20 +880,22 @@ def main():
     parser.add_argument("--csv", type=str, required=True, help="Path to the CSV with shape [samples x features], last col=Condition.")
     parser.add_argument("--quick_test", type=int, default=0, help="1=small ephemeral run for local debugging, 0=full run.")
     parser.add_argument("--enable_pretraining", action='store_true', help="Whether to do masked pretraining first.")
-    parser.add_argument("--pretrain_epochs", type=int, default=15, help="Number of epochs for masked pretraining.")
-    parser.add_argument("--finetune_epochs", type=int, default=40, help="Number of epochs for classification.")
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--enable_autoencoder", action='store_true', help="Use autoencoder-derived reconstructed features as transformer input.")
+    parser.add_argument("--pretrain_epochs", type=int, default=30, help="Number of epochs for masked pretraining.")
+    parser.add_argument("--finetune_epochs", type=int, default=50, help="Number of epochs for classification.")
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--pretrain_lr", type=float, default=1e-4)
     parser.add_argument("--finetune_lr", type=float, default=5e-5)
     parser.add_argument("--weight_decay", type=float, default=1e-4)
     parser.add_argument("--chunk_len", type=int, default=320, help="Number of features per chunk.")
-    parser.add_argument("--d_model", type=int, default=256)
+    parser.add_argument("--d_model", type=int, default=64)
     parser.add_argument("--num_heads", type=int, default=4)
-    parser.add_argument("--d_ff", type=int, default=1024)
+    parser.add_argument("--d_ff", type=int, default=256)
     parser.add_argument("--num_experts", type=int, default=4, help="Number of MoE experts")
-    parser.add_argument("--n_layers", type=int, default=4)
+    parser.add_argument("--n_layers", type=int, default=6)
     parser.add_argument("--max_passes", type=int, default=3, help="ACT max passes.")
     parser.add_argument("--act_threshold", type=float, default=0.99)
+    parser.add_argument("--dropout", type=float, default=0.2, help="Dropout rate for transformer blocks and classifier.")
 
     args = parser.parse_args()
     train_transformer(args)

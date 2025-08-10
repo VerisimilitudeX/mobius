@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """
-A multi-page, parallax-scrolling, dark-themed Dash app that:
-  • Emulates the advanced look & feel of modern design sites (like Vercel, Fleava).
-  • Provides advanced transitions, animations, and a collapsible dark sidebar.
-  • Contains multiple pages: Home (parallax hero), Epigenetics (some dynamic sections),
-    "ME vs LC" data views, "Run Pipeline" functionality, logs, and more.
-  • Over 300 lines long for demonstration.
+Dark-themed Dash dashboard for Mobius epigenomic pipeline.
 
 Ensure you have installed:
   pip install dash dash-bootstrap-components dash-extensions plotly
-Also place your custom fonts/images in assets/, along with the custom CSS file (detailed below).
+Place custom CSS in assets/ for styling/animations if desired.
 """
 
 import dash
@@ -24,17 +19,23 @@ from dash_extensions import EventListener  # for advanced scrolling events, etc.
 # Configuration
 ##############################################
 
-BASE_DIR = "/Volumes/T9/EpiMECoV"  # Adjust as needed
+"""Resolve repository root dynamically to avoid hard-coded paths."""
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
 RUN_PIPELINE_R = os.path.join(BASE_DIR, "src", "original", "run_pipeline_master.R")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
-DUMMY_LOG_FILE = os.path.join(RESULTS_DIR, "pipeline_log.txt")
 
-# Example fallback data
-df_fallback = pd.DataFrame({
-    "X": [1,2,3,4],
-    "Y": [2,1,4,3],
-    "Condition": ["ME","LC","Control","ME"]
-})
+# Store the last pipeline run output in-memory so the Logs page can display it
+PIPELINE_OUTPUT = ""
+
+def load_image_as_base64(path: str) -> str | None:
+    try:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        return None
+    return None
 
 # The theme is dark, we use LUX, MINTY, SLATE, or custom. We'll pick a dark theme:
 external_stylesheets = [dbc.themes.SLATE]
@@ -177,16 +178,40 @@ def layout_home():
     return html.Div([hero, about])
 
 def layout_epigenetics():
-    # Possibly some advanced content
-    return dbc.Container([
+    pca_path = os.path.join(RESULTS_DIR, "pca_plot.png")
+    cm_path = os.path.join(RESULTS_DIR, "transformer_holdout_confusion.png")
+    pca_b64 = load_image_as_base64(pca_path)
+    cm_b64 = load_image_as_base64(cm_path)
+
+    children = [
         html.H2("Epigenetics & Pipeline", className="mt-4 text-light"),
-        html.P("Dive deeper into the advanced epigenetics pipeline, covering data ingestion, differential analysis, and a self-supervised transformer approach. This page can contain multi-step instructions, interactive plots, etc.", style={"color":"#ccc"}),
-        # Example plot
-        dcc.Graph(figure=px.scatter(df_fallback, x="X", y="Y", color="Condition", title="Fallback Visualization"), style={"marginTop":"2rem"})
-    ], fluid=True, className="page-content")
+        html.P(
+            "Pipeline outputs including PCA visualization and classifier confusion matrix.",
+            style={"color": "#ccc"},
+        ),
+    ]
+
+    if pca_b64:
+        children.append(
+            html.Div([
+                html.H4("PCA Plot", className="text-light"),
+                html.Img(src=f"data:image/png;base64,{pca_b64}", style={"maxWidth": "100%"}),
+            ], style={"marginTop": "1rem"})
+        )
+    if cm_b64:
+        children.append(
+            html.Div([
+                html.H4("Confusion Matrix", className="text-light"),
+                html.Img(src=f"data:image/png;base64,{cm_b64}", style={"maxWidth": "100%"}),
+            ], style={"marginTop": "1rem"})
+        )
+
+    if len(children) == 2:
+        children.append(html.P("No figures found yet in results/. Run the pipeline to populate outputs.", style={"color": "#aaa"}))
+
+    return dbc.Container(children, fluid=True, className="page-content")
 
 def layout_me_lc():
-    # Some advanced layout with multiple sections, maybe a parallax
     section1 = html.Div(
         className="parallax-section",
         style={
@@ -202,12 +227,31 @@ def layout_me_lc():
             html.Div("ME/CFS vs Long COVID Comparison", style={"fontSize":"2.5rem","color":"#fdfdfd","textAlign":"center"})
         ]
     )
-    content = dbc.Container([
-        html.H3("Differential Methylation", className="text-light mt-4"),
-        html.P("Here we highlight specific CpG sites that are hyper/hypomethylated differently in ME vs. LC. Possibly show advanced Sankey or chord diagrams for gene pathways.", style={"color":"#ccc","fontSize":"1.1rem"}),
-        # Another placeholder
-        dcc.Graph(figure=px.imshow([[0,1,2],[2,1,0]], title="Methylation Heatmap Example"), style={"marginBottom":"3rem"})
-    ], fluid=True, className="page-content")
+    # Show available DMP/network visuals if present
+    volcano_path = os.path.join(RESULTS_DIR, "volcano_plot.png")
+    network_path = os.path.join(RESULTS_DIR, "network_diagram.png")
+    volcano_b64 = load_image_as_base64(volcano_path)
+    network_b64 = load_image_as_base64(network_path)
+
+    content_children = [html.H3("Differential Methylation", className="text-light mt-4")]
+    if volcano_b64:
+        content_children.append(
+            html.Div([
+                html.H4("Volcano Plot", className="text-light"),
+                html.Img(src=f"data:image/png;base64,{volcano_b64}", style={"maxWidth": "100%"}),
+            ], style={"marginTop": "1rem", "marginBottom": "1rem"})
+        )
+    if network_b64:
+        content_children.append(
+            html.Div([
+                html.H4("Co-annotation Network", className="text-light"),
+                html.Img(src=f"data:image/png;base64,{network_b64}", style={"maxWidth": "100%"}),
+            ], style={"marginTop": "1rem", "marginBottom": "1rem"})
+        )
+    if len(content_children) == 1:
+        content_children.append(html.P("Run visualization step to generate volcano/network figures.", style={"color":"#aaa"}))
+
+    content = dbc.Container(content_children, fluid=True, className="page-content")
 
     return html.Div([section1, content])
 
@@ -295,27 +339,29 @@ def save_config(n_clicks, c1, c2, c3):
     [Input("run-pipeline-btn","n_clicks")]
 )
 def run_pipeline(n_clicks):
+    global PIPELINE_OUTPUT
     if not n_clicks:
         return ""
     try:
-        # Write dummy logs
-        with open(DUMMY_LOG_FILE,"w") as f:
-            f.write("Simulating pipeline...\n")
-            time.sleep(1)
-            f.write("Loading IDATs...\n")
-            time.sleep(1)
-            f.write("Differential analysis...\n")
-            time.sleep(1)
-            f.write("Transformer training...\n")
-            time.sleep(1)
-            f.write("Pipeline finished.\n")
-        # Actually attempt the pipeline call
+        # Execute the real pipeline and capture its output
         cmd = ["Rscript", RUN_PIPELINE_R, "0", "--web_mode=TRUE"]
-        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        return "Pipeline completed successfully."
-    except subprocess.CalledProcessError as e:
-        return f"Pipeline error: {e.output.decode('utf-8','ignore')}"
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        lines = []
+        for line in proc.stdout:  # type: ignore[attr-defined]
+            lines.append(line)
+        proc.wait()
+        PIPELINE_OUTPUT = "".join(lines)
+        if proc.returncode == 0:
+            return "Pipeline completed successfully."
+        return "Pipeline finished with errors. Check Logs tab for details."
     except Exception as ex:
+        PIPELINE_OUTPUT = f"Error running pipeline: {str(ex)}"
         return f"Error: {str(ex)}"
 
 # Show logs
@@ -326,10 +372,7 @@ def run_pipeline(n_clicks):
 def update_logs(n_clicks):
     if not n_clicks:
         return "No logs yet."
-    if os.path.exists(DUMMY_LOG_FILE):
-        with open(DUMMY_LOG_FILE,"r") as f:
-            return f.read()
-    return "No logs yet."
+    return PIPELINE_OUTPUT or "No logs yet."
 
 ##############################################
 

@@ -759,29 +759,72 @@ def plot_upset(dmp_files, out_path):
 
 def plot_network(dmp_csv, out_path):
     """
-    Currently a 'dummy' chain network linking top 50 CpGs from the DMP CSV.
-    For a biologically meaningful approach, you might compute co-methylation
-    edges or shared pathway edges, etc.
+    Build a simple co-annotation network over top CpGs based on shared gene symbols
+    if available in the DMP file (expects a 'Gene' or 'UCSC_RefGene_Name' column).
+    Falls back to no-op if annotations are missing.
     """
     if not os.path.exists(dmp_csv):
         raise FileNotFoundError(dmp_csv)
 
     df = pd.read_csv(dmp_csv)
-    if 'CpG' in df.columns:
-        cpgs = df['CpG'].head(50).tolist()
-    else:
-        cpgs = df.iloc[:,0].head(50).tolist()
+    cpg_col = 'CpG' if 'CpG' in df.columns else df.columns[0]
+    gene_col = None
+    for col in ['Gene', 'UCSC_RefGene_Name', 'gene', 'GeneSymbol']:
+        if col in df.columns:
+            gene_col = col
+            break
 
+    top = df.head(200).copy()
+    top_cpgs = top[cpg_col].astype(str).tolist()
+
+    if gene_col is None:
+        print("[INFO] No gene annotation column found; skipping network diagram.")
+        return
+
+    # Split multiple genes per CpG if present
+    def split_genes(val):
+        if pd.isna(val):
+            return []
+        s = str(val)
+        if ';' in s:
+            return [g.strip() for g in s.split(';') if g.strip()]
+        if ',' in s:
+            return [g.strip() for g in s.split(',') if g.strip()]
+        return [s.strip()] if s.strip() else []
+
+    top['__genes__'] = top[gene_col].apply(split_genes)
+    # Build edges between CpGs that share at least one gene
     G = nx.Graph()
-    G.add_nodes_from(cpgs)
-    # Dummy chain edges:
-    for i in range(len(cpgs)-1):
-        G.add_edge(cpgs[i], cpgs[i+1])
+    for cpg in top_cpgs:
+        G.add_node(cpg)
 
-    plt.figure(figsize=(8,6))
-    pos = nx.spring_layout(G)
-    nx.draw(G, pos, with_labels=True, node_color="skyblue", edge_color="gray", font_size=8)
-    plt.title("Network Diagram (Top 50 DMPs)")
+    gene_to_cpgs = {}
+    for _, row in top.iterrows():
+        cpg = str(row[cpg_col])
+        for g in row['__genes__']:
+            gene_to_cpgs.setdefault(g, []).append(cpg)
+
+    for cpg_list in gene_to_cpgs.values():
+        if len(cpg_list) > 1:
+            # Connect all pairs within this gene bucket
+            for i in range(len(cpg_list)):
+                for j in range(i+1, len(cpg_list)):
+                    G.add_edge(cpg_list[i], cpg_list[j])
+
+    if G.number_of_edges() == 0:
+        print("[INFO] No shared-gene edges detected; skipping network diagram.")
+        return
+
+    plt.figure(figsize=(10,8))
+    pos = nx.spring_layout(G, seed=42)
+    nx.draw(
+        G, pos,
+        with_labels=False,
+        node_size=80,
+        node_color="steelblue",
+        edge_color="lightgray"
+    )
+    plt.title("Co-annotation Network (Top DMPs)")
     plt.tight_layout()
     plt.savefig(out_path, dpi=300)
     plt.close()
@@ -791,13 +834,16 @@ def plot_network(dmp_csv, out_path):
 # Main function
 # ----------------------------
 def main():
-    results_dir = "/Volumes/T9/EpiMECoV/visuals"
+    # Resolve repository root dynamically
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(current_dir, "..", "..", "..", ".."))
+    results_dir = os.path.join(repo_root, "results")
     os.makedirs(results_dir, exist_ok=True)
 
-    data_csv = "/Volumes/T9/EpiMECoV/processed_data/transformed_data.csv"
+    data_csv = os.path.join(repo_root, "processed_data", "transformed_data.csv")
     if not os.path.exists(data_csv):
         print("[WARN] No transformed_data.csv. Falling back to cleaned_data.csv.")
-        data_csv = "/Volumes/T9/EpiMECoV/processed_data/cleaned_data.csv"
+        data_csv = os.path.join(repo_root, "processed_data", "cleaned_data.csv")
     if not os.path.exists(data_csv):
         print("[WARN] No cleaned_data.csv. Exiting visualization early.")
         return
@@ -807,7 +853,7 @@ def main():
         print("[ERROR] Condition missing in data. Exiting.")
         return
 
-    # Example fix: Merge any 'Noel ME' labels into 'ME'
+    # Normalize labels: merge any 'Noel ME' into 'ME'
     print("Unique conditions BEFORE fix:", df['Condition'].unique())
     df.loc[df['Condition'] == "Noel ME", "Condition"] = "ME"
     print("Unique conditions AFTER fix:", df['Condition'].unique())
@@ -836,8 +882,8 @@ def main():
     imputed_df = pd.DataFrame(Xs, columns=[f"Imputed_{i}" for i in range(Xs.shape[1])])
     imputed_df["Condition"] = y
 
-    # We'll do a small random forest to see feature importances for demonstration
-    # (In real usage, you might skip this if you don't want a quick internal model.)
+    # Train a small random forest to inspect feature importances
+    # (Optional: skip if you do not want an internal model.)
     from sklearn.ensemble import RandomForestClassifier
     top_rf_cols = [c for c in feat_cols[:100] if c in df.columns]
     if len(top_rf_cols) > 0:
@@ -853,9 +899,9 @@ def main():
 
     # DMP CSVs if they exist
     dmp_files = {
-        "ME_vs_Control": os.path.join("/Volumes/T9/EpiMECoV/results", "DMP_ME_vs_Control.csv"),
-        "LC_vs_Control": os.path.join("/Volumes/T9/EpiMECoV/results", "DMP_LC_vs_Control.csv"),
-        "ME_vs_LC":      os.path.join("/Volumes/T9/EpiMECoV/results", "DMP_ME_vs_LC.csv")
+        "ME_vs_Control": os.path.join(results_dir, "DMP_ME_vs_Control.csv"),
+        "LC_vs_Control": os.path.join(results_dir, "DMP_LC_vs_Control.csv"),
+        "ME_vs_LC":      os.path.join(results_dir, "DMP_ME_vs_LC.csv")
     }
 
     # Generate visuals
@@ -867,11 +913,11 @@ def main():
               os.path.join(results_dir, "scatter_cpg.png"),
               os.path.join(results_dir, "box_cpg.png"))
     safe_call(plot_volcano,
-              os.path.join("/Volumes/T9/EpiMECoV/results", "DMP_ME_vs_Control.csv"),
+              os.path.join(results_dir, "DMP_ME_vs_Control.csv"),
               os.path.join(results_dir, "volcano_plot.png"))
     safe_call(plot_upset, dmp_files, os.path.join(results_dir, "intersection_plot.png"))
     safe_call(plot_network,
-              os.path.join("/Volumes/T9/EpiMECoV/results", "DMP_ME_vs_Control.csv"),
+              os.path.join(results_dir, "DMP_ME_vs_Control.csv"),
               os.path.join(results_dir, "network_diagram.png"))
     safe_call(plot_pca_scree, Xs, os.path.join(results_dir, "pca_scree_plot.png"))
     safe_call(plot_pca_biplot, Xs, y, os.path.join(results_dir, "pca_biplot.png"))
@@ -914,7 +960,7 @@ def main():
         safe_call(plot_classifier_confusion_matrix, cm_rf, np.unique(df["Condition"].values),
                   os.path.join(results_dir, "confusion_matrix.png"))
 
-    # Sankey example
+    # Optional Sankey diagram (requires plotly + kaleido)
     safe_call(plot_sankey_diagram,
               os.path.join(results_dir, "sankey_diagram.png"))
 

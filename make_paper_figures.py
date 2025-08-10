@@ -216,7 +216,7 @@ def main():
     for fold_i, (tr_idx, va_idx) in enumerate(skf.split(X_trainval, y_trainval), start=1):
         X_tr, X_va = X_trainval[tr_idx], X_trainval[va_idx]
         y_tr, y_va = y_trainval[tr_idx], y_trainval[va_idx]
-        rf_clf = RandomForestClassifier(n_estimators=200, random_state=42)
+        rf_clf = RandomForestClassifier(n_estimators=100, random_state=42)
         rf_clf.fit(X_tr, y_tr)
         va_preds = rf_clf.predict(X_va)
         f1_v = f1_score(y_va, va_preds, average='macro')

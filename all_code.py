@@ -32,14 +32,21 @@ PROGRAMMING_EXTENSIONS = {
 
 # Define directories to exclude during file aggregation and directory tree generation
 EXCLUDE_DIRS = {
-        'venv', 
-        'node_modules', 
-        '__pycache__', 
-        '.git', 
-        'dist', 
-        'build',  
-        'temp', 
-        'old_files', 
+        'venv',
+        '.venv',
+        '.webenv',
+        'wandb',
+        'results',
+        'data',
+        'processed_data',
+        'docs',
+        'node_modules',
+        '__pycache__',
+        '.git',
+        'dist',
+        'build',
+        'temp',
+        'old_files',
         'flask_session'
 }
 

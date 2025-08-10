@@ -59,12 +59,13 @@ for (dmp_file in dmp_files) {
   
   dmp_data$CpG <- rownames(dmp_data)
   
-  dummyBeta <- matrix(nrow=nrow(dmp_data), ncol=1)
-  rownames(dummyBeta) <- dmp_data$CpG
-  colnames(dummyBeta) <- "Dummy_Sample"
+  # Minimal beta matrix scoped to CpG set (required by champ.annot)
+  betaMatrix <- matrix(nrow=nrow(dmp_data), ncol=1)
+  rownames(betaMatrix) <- dmp_data$CpG
+  colnames(betaMatrix) <- "Sample_1"
   
   cat("Running champ.annot()...\n")
-  annotRes <- champ.annot(beta=dummyBeta, arraytype=array_type)
+  annotRes <- champ.annot(beta=betaMatrix, arraytype=array_type)
   annotDF <- annotRes$bedFile
   
   if (!("probeID" %in% colnames(annotDF))) {

@@ -18,19 +18,20 @@ import matplotlib.pyplot as plt
 import wandb  # Added wandb import
 
 # Global hyperparameters
-CHUNK_SIZE = 1000     # each token dimension
-BATCH_SIZE = 8
-PRETRAIN_EPOCHS = 30  # mandatory self-supervised pretraining epochs
-FINETUNE_EPOCHS = 100 # classification epochs
-LEARNING_RATE = 1e-4
+# Per paper defaults
+CHUNK_SIZE = 320
+BATCH_SIZE = 16
+PRETRAIN_EPOCHS = 30
+FINETUNE_EPOCHS = 50
+LEARNING_RATE = 5e-5
 
-MODEL_DIM = 256
-FF_DIM    = 1024
+MODEL_DIM = 64
+FF_DIM    = 256
 N_LAYERS  = 6
-NUM_HEADS = 8
+NUM_HEADS = 4
 DROPOUT   = 0.2
 MOE_EXPERTS = 4
-LORA_R     = 8  # LoRA rank
+LORA_R     = 8
 
 # ----------------------------
 # Dataset

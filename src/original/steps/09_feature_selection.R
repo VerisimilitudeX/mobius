@@ -47,30 +47,46 @@ all_cpg_out <- file.path(processed_dir, "all_cpg_matrix.csv")
 write.csv(beta_big, all_cpg_out, quote = FALSE)
 cat("[INFO] Also wrote out full CpG data to =>", all_cpg_out, "\n")
 
-# 3) Read the top DMP CpG IDs from the three contrast files and take their union
+# 3) Read the top DMP CpG IDs from the three contrast files and take their union,
+#    then select exactly the top 1,280 CpGs by adjusted P-value as per paper.
 dmp_me_ctrl_file <- file.path(results_dir, "DMP_ME_vs_Control.csv")
 dmp_lc_ctrl_file <- file.path(results_dir, "DMP_LC_vs_Control.csv")
 dmp_me_lc_file   <- file.path(results_dir, "DMP_ME_vs_LC.csv")
 
 cpg_union <- c()
-if (file.exists(dmp_me_ctrl_file)) {
-  dmp1 <- read.csv(dmp_me_ctrl_file, row.names = 1, stringsAsFactors = FALSE)
-  cpg1 <- rownames(dmp1)
-  if (!is.null(cpg1)) {
-    cpg_union <- unique(c(cpg_union, cpg1))
+collect_dmp <- function(path) {
+  if (!file.exists(path)) return(NULL)
+  df <- read.csv(path, row.names = 1, stringsAsFactors = FALSE)
+  # Expect BH-adjusted P-value column names commonly used by limma
+  pcols <- intersect(colnames(df), c("adj.P.Val", "adj.P.Val.", "adjP", "adj_p"))
+  pcol <- if (length(pcols) > 0) pcols[1] else NA
+  if (is.na(pcol)) {
+    # fallback: try P.Value if adj not present
+    pcol <- if ("P.Value" %in% colnames(df)) "P.Value" else NULL
   }
+  if (is.null(pcol)) return(NULL)
+  data.frame(CpG = rownames(df), adjP = df[[pcol]], stringsAsFactors = FALSE)
 }
-if (file.exists(dmp_lc_ctrl_file)) {
-  dmp2 <- read.csv(dmp_lc_ctrl_file, row.names = 1, stringsAsFactors = FALSE)
-  cpg2 <- rownames(dmp2)
-  cpg_union <- unique(c(cpg_union, cpg2))
+
+d1 <- collect_dmp(dmp_me_ctrl_file)
+d2 <- collect_dmp(dmp_lc_ctrl_file)
+d3 <- collect_dmp(dmp_me_lc_file)
+d_all <- do.call(rbind, Filter(Negate(is.null), list(d1, d2, d3)))
+
+if (is.null(d_all) || nrow(d_all) == 0) {
+  cat("[WARN] No DMPs found => skipping feature selection.\n")
+  out_path <- file.path(processed_dir, "feature_selected_matrix.csv")
+  write.csv(beta_big, out_path, quote = FALSE)
+  cat("[SAVED] =>", out_path, "\n")
+  quit(status = 0)
 }
-if (file.exists(dmp_me_lc_file)) {
-  dmp3 <- read.csv(dmp_me_lc_file, row.names = 1, stringsAsFactors = FALSE)
-  cpg3 <- rownames(dmp3)
-  cpg_union <- unique(c(cpg_union, cpg3))
-}
-cat("[INFO] Unique DMP CpGs:", length(cpg_union), "\n")
+
+# Aggregate best adjP per CpG across contrasts, then pick top 1280 by adjP
+agg <- aggregate(adjP ~ CpG, data = d_all, FUN = function(x) min(as.numeric(x), na.rm = TRUE))
+agg <- agg[order(agg$adjP, decreasing = FALSE), ]
+top_n <- min(1280, nrow(agg))
+selected_cpgs <- agg$CpG[seq_len(top_n)]
+cat("[INFO] Selected top", top_n, "CpGs (target=1280) by adjusted P-value.\n")
 
 if (length(cpg_union) < 1) {
   cat("[WARN] No DMPs found => skipping feature selection.\n")
@@ -80,15 +96,30 @@ if (length(cpg_union) < 1) {
   quit(status = 0)
 }
 
-# 4) Subset the big Beta matrix using the row names as probe IDs
+# 4) Subset and order by genomic coordinates to create contiguous blocks per token
 probe_ids <- rownames(beta_big)
 if (length(probe_ids) == 0) {
   stop("[ERROR] Could not identify the probe IDs in the row names.")
 }
 
-keep_idx <- which(probe_ids %in% cpg_union)
+keep_idx <- which(probe_ids %in% selected_cpgs)
 subset_mat <- beta_big[keep_idx, , drop = FALSE]
 cat("[INFO] Post-subset dimension:", dim(subset_mat), "\n")
+
+# Try to order CpGs by genomic coordinate if annotation available via minfi
+suppressWarnings(suppressMessages({
+  try({
+    library(minfi)
+    anno <- getAnnotation(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+    # match and order
+    common <- intersect(rownames(anno), rownames(subset_mat))
+    anno_sub <- anno[common, c("chr", "pos")]
+    ord <- order(anno_sub$chr, anno_sub$pos, na.last = TRUE)
+    ordered_ids <- rownames(anno_sub)[ord]
+    subset_mat <- subset_mat[ordered_ids, , drop = FALSE]
+    cat("[INFO] Ordered selected CpGs by genomic position.", "\n")
+  }, silent = TRUE)
+}))
 
 # 5) Re-append the Condition vector.
 # (Assuming the original beta_big has a "Condition" column)

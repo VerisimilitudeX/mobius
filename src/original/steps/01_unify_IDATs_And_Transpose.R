@@ -47,9 +47,9 @@ pkg_list <- c(
   "BiocParallel",
   "minfiData",
   "IlluminaHumanMethylation450kanno.ilmn12.hg19",
-  "maxprobes",  # to handle cross-reactive or SNP-affected probes if desired
-  "wateRmelon", # for BMIQ normalization
-  "missMethyl"  # for RUVM batch correction via RUVfit/RUVadj
+  "maxprobes",   # to handle cross-reactive or SNP-affected probes if desired
+  "wateRmelon",  # for BMIQ normalization
+  "sva"          # for ComBat batch-effect correction
 )
 
 install_if_missing <- function(pkg) {
@@ -286,8 +286,12 @@ preprocessPlatform <- function(rgSet, array_label="450K") {
   keep <- colMeans(detP < 0.01) > 0.98
   rgSet <- rgSet[, keep, drop=FALSE]
   
-  cat("[INFO]", array_label, "=> preprocessNoob...\n")
+  cat("[INFO]", array_label, "=> preprocessNoob (background correction) ...\n")
   gmSet <- preprocessNoob(rgSet)
+  
+  # Optional quantile normalization if desired per paper phrasing
+  cat("[INFO]", array_label, "=> preprocessQuantile (quantile normalization) ...\n")
+  gmSet <- preprocessQuantile(gmSet)
   
   cat("[INFO]", array_label, "=> mapToGenome...\n")
   gmSet <- mapToGenome(gmSet)
@@ -315,35 +319,34 @@ preprocessPlatform <- function(rgSet, array_label="450K") {
   write.csv(betas_bmiq, outFileCSV_BMIQ, quote = FALSE)
   cat("[SAVED]", outFileCSV_BMIQ, "\n")
   
-  # --- Apply RUVM Batch Correction using RUVfit and RUVadj ---
-  cat("[INFO] Applying RUVM batch correction using RUVfit/RUVadj...\n")
-  # Convert BMIQ-normalized beta values to M-values (M = log2(beta/(1-beta)))
-  mVals <- getM(gmSet_bmiq)
-  # Select empirical control probes (ECPs) using a simple approach:
-  # create a logical vector: TRUE if probe SD is less than the 25th percentile.
-  controlIndex <- apply(mVals, 1, sd, na.rm = TRUE) < quantile(apply(mVals, 1, sd, na.rm = TRUE), 0.25)
-  cat("[INFO] Number of control probes for RUVM batch correction:", sum(controlIndex), "\n")
-  # Set up a design matrix with an intercept only (one column of 1's)
-  design_ruv <- matrix(1, ncol = ncol(mVals), nrow = ncol(mVals))
-  # Estimate unwanted variation using RUVfit
-  ruv_fit <- RUVfit(Y = mVals, X = design_ruv, ctl = controlIndex)
-  # Adjust using RUVadj
-  ruv_adj <- RUVadj(Y = mVals, fit = ruv_fit)
-  # Extract adjusted M-values (for visualization only)
-  mVals_ruvm <- getAdj(Y = mVals, fit = ruv_adj)
-  # Convert corrected M-values back to beta values: beta = 2^M / (2^M + 1)
-  betas_ruvm <- 2^mVals_ruvm / (2^mVals_ruvm + 1)
+  # --- Apply ComBat Batch Correction (sva) ---
+  cat("[INFO] Applying ComBat batch-effect correction (sva)...\n")
+  betas_bmiq <- assay(gmSet_bmiq, "Beta")
+  # Build batch vector: if 'Slide' info exists in pData, use it; otherwise use 'Array'
+  pd <- pData(gmSet_bmiq)
+  batch <- NULL
+  if (!is.null(pd$Slide)) {
+    batch <- as.factor(pd$Slide)
+  } else if (!is.null(pd$Array)) {
+    batch <- as.factor(pd$Array)
+  } else {
+    # fallback: use Condition as batch proxy (not ideal, but avoids failure)
+    batch <- as.factor(pd$Condition)
+  }
+  # ComBat expects genes x samples matrix (features x samples)
+  require(sva)
+  combat_corrected <- ComBat(dat = betas_bmiq, batch = batch, par.prior = TRUE, prior.plots = FALSE)
   
-  # Update the GenomicMethylSet with RUVM corrected beta values
+  # Update GenomicMethylSet with ComBat-corrected betas
   gmSet_corrected <- gmSet_bmiq
-  assay(gmSet_corrected, "Beta") <- betas_ruvm
+  assay(gmSet_corrected, "Beta") <- combat_corrected
   
-  outFileRDS_corrected <- file.path(processed_dir, paste0(array_label, "_Final_GenomicMethylSet_RUVM.rds"))
+  outFileRDS_corrected <- file.path(processed_dir, paste0(array_label, "_Final_GenomicMethylSet_ComBat.rds"))
   saveRDS(gmSet_corrected, outFileRDS_corrected)
   cat("[SAVED]", outFileRDS_corrected, "\n")
   
-  outFileCSV_corrected <- file.path(processed_dir, paste0(array_label, "_BetaValues_RUVM.csv"))
-  write.csv(betas_ruvm, outFileCSV_corrected, quote = FALSE)
+  outFileCSV_corrected <- file.path(processed_dir, paste0(array_label, "_BetaValues_ComBat.csv"))
+  write.csv(combat_corrected, outFileCSV_corrected, quote = FALSE)
   cat("[SAVED]", outFileCSV_corrected, "\n")
   
   return(gmSet_corrected)

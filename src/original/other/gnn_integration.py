@@ -3,12 +3,8 @@
 gnn_integration.py
 
 Purpose:
-  Implements a simple Graph Neural Network (GNN) module for integrating gene regulatory
-  network information with epigenetic data. The module uses a Graph Convolutional
-  Network (GCN) layer and demonstrates its usage on dummy data.
-  
-Usage:
-  python gnn_integration.py
+  Provides a compact Graph Convolutional Network (GCN) building block intended
+  for import and use by training scripts.
 """
 
 import torch
@@ -42,21 +38,5 @@ class GNNIntegration(nn.Module):
         out = self.classifier(x)
         return out
 
-def main():
-    # Dummy data: 100 nodes, each with 64 features
-    num_nodes = 100
-    in_features = 64
-    hidden_dim = 32
-    num_classes = 3
-    X = torch.randn(num_nodes, in_features)
-    # Create a random symmetric adjacency matrix with self-loops
-    A = torch.randint(0, 2, (num_nodes, num_nodes)).float()
-    A = (A + A.t()) / 2
-    A.fill_diagonal_(1)
-    model = GNNIntegration(in_features, hidden_dim, num_classes)
-    logits = model(X, A)
-    print("GNN output logits:", logits)
-    print("Predicted class:", logits.argmax().item())
-
 if __name__ == "__main__":
-    main()
+    print("This module provides GNN layers/classes. Import and use within your training code.")

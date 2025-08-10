@@ -18,3 +18,4 @@ pybedtools>=0.8.0  # For genomic interval operations
 pyBigWig>=0.3.18  # For genomic annotations
 torch-geometric>=2.0.0  # For GNN operations
 einops>=0.4.0  # For tensor operations
+xgboost>=1.4.0

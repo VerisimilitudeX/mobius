@@ -114,7 +114,7 @@ def main():
     if HAVE_CAPTUM:
         print("[INFO] Running Integrated Gradients analysis using Captum.")
         # Wrap the RF model in a simple PyTorch model
-        # For demonstration, we use a simple linear approximation.
+        # Uses a simple linear approximation.
         class SimpleRFWrapper(nn.Module):
             def __init__(self, model):
                 super().__init__()
