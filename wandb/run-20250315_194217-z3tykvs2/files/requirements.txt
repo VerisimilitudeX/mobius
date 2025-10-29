@@ -62,7 +62,7 @@ safetensors==0.5.0
 multidict==6.1.0
 olefile==0.47
 nltk==3.9.1
-uv==0.6.5
+uv==0.9.6
 pybind11==2.13.6
 Flask-Caching==2.3.0
 spacy==3.8.4
