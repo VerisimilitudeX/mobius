@@ -227,7 +227,7 @@ langcodes==3.5.0
 dill==0.3.8
 torchmetrics==1.5.2
 hyperframe==5.2.0
-mlx==0.21.1
+mlx==0.29.4
 pytimeparse==1.1.8
 Flask==3.0.3
 tblib==3.0.0
