@@ -222,7 +222,7 @@ cycler==0.12.1
 ipywidgets==8.1.5
 jaraco.functools==4.1.0
 wheel==0.45.1
-aiohttp==3.9.1
+aiohttp==3.13.3
 langcodes==3.5.0
 dill==0.3.8
 torchmetrics==1.5.2
